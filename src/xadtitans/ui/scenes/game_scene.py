@@ -1,4 +1,4 @@
-"""Cena do tabuleiro — partida com IA ou 2 jogadores.
+"""Cena do tabuleiro — suporta todos os modos de jogo.
 
 Responsabilidades:
   - Seleção e movimentação por clique (regras via ``core.game.Game``);
@@ -7,7 +7,8 @@ Responsabilidades:
   - Hover, destaques e diálogo de promoção com sprites;
   - Sons (``audio.AudioManager``);
   - Painel lateral (jogadas em SAN + peças capturadas);
-  - IA local em thread separada (``ai.worker.AIWorker``).
+  - IA local em thread separada (``ai.worker.AIWorker``);
+  - Suporte a ``GameMode``: HUMAN_VS_HUMAN, HUMAN_VS_AI, AI_VS_AI.
 
 Teclas: ``F`` vira o tabuleiro, ``U`` desfaz, ``R`` desiste.
 """
@@ -28,7 +29,7 @@ from xadtitans.config import (
     WINDOW_WIDTH,
 )
 from xadtitans.core.game import Game
-from xadtitans.core.types import Level
+from xadtitans.core.types import GameMode, Level
 from xadtitans.ui.animations import FADE, SLIDE, Anim, Animator, ease_out_cubic
 from xadtitans.ui.board_view import BoardView
 from xadtitans.ui.widgets.side_panel import SidePanel
@@ -43,15 +44,30 @@ _PROMO_PIECES: list[chess.PieceType] = [
 _MOVE_DUR = 0.16
 _FADE_DUR = 0.22
 
+# Intervalo visual (segundos) entre lances no modo AI_VS_AI.
+# Controla o tempo mínimo entre o fim de uma animação e o início
+# da busca do próximo lance, permitindo que o jogador acompanhe
+# a partida visualmente.
+AI_VS_AI_DELAY: float = 0.4
+
 
 class GameScene:
-    """Tela principal da partida (humano vs humano ou humano vs IA)."""
+    """Tela principal da partida com suporte a todos os modos de jogo.
+
+    Modos suportados (via ``GameMode``):
+      - ``HUMAN_VS_HUMAN``: ambos os lados são humanos;
+      - ``HUMAN_VS_AI``: um lado é controlado pela IA;
+      - ``AI_VS_AI``: ambos os lados são controlados por IA,
+        com intervalo visual entre lances.
+    """
 
     def __init__(
         self,
         audio: AudioManager | None = None,
+        game_mode: GameMode = GameMode.HUMAN_VS_HUMAN,
         ai_color: chess.Color | None = None,
         ai_level: Level = Level.MEDIO,
+        ai_vs_ai_delay: float = AI_VS_AI_DELAY,
     ) -> None:
         self.game = Game()
         self.board_view = BoardView()
@@ -64,10 +80,33 @@ class GameScene:
             pygame.Rect(PANEL_X, 12, PANEL_W, WINDOW_HEIGHT - 24),
         )
 
-        # IA
-        self.ai_color = ai_color  # None = 2 jogadores
+        # ── Modo de jogo e controle de IA ────────────────
+        self.game_mode = game_mode
         self.ai_level = ai_level
+        self.ai_vs_ai_delay = ai_vs_ai_delay
+
+        # Lados controlados por IA (derivados do modo de jogo).
+        if game_mode == GameMode.HUMAN_VS_HUMAN:
+            self._white_is_ai = False
+            self._black_is_ai = False
+        elif game_mode == GameMode.AI_VS_AI:
+            self._white_is_ai = True
+            self._black_is_ai = True
+        else:
+            # HUMAN_VS_AI — ai_color indica quem é a IA.
+            # Se não informado, padrão: humano brancas, IA pretas.
+            ai_side = ai_color if ai_color is not None else chess.BLACK
+            self._white_is_ai = ai_side is chess.WHITE
+            self._black_is_ai = ai_side is chess.BLACK
+
         self._ai_worker: AIWorker | None = None
+
+        # Token de geração para invalidar resultados de IA obsoletos.
+        # Incrementa a cada nova partida ou cancelamento.
+        self._generation: int = 0
+
+        # Timer para intervalo visual no modo AI_VS_AI.
+        self._ai_vs_ai_timer: float = 0.0
 
         # Promoção pendente
         self.pending_promotion: tuple[int, int] | None = None
@@ -76,8 +115,11 @@ class GameScene:
         # Fonte para "Pensando..."
         self._thinking_font = pygame.font.SysFont("arial", 20, bold=True)
 
+        # Orientação do tabuleiro
+        self._setup_board_orientation()
+
         # Se a IA joga primeiro, iniciar busca imediatamente
-        if self.ai_color is not None and self.game.board.turn == self.ai_color:
+        if self._is_ai_turn:
             self._start_ai()
 
     # ── interface de cena ─────────────────────────────────
@@ -101,6 +143,7 @@ class GameScene:
 
     def update(self, dt: float) -> None:
         self.animator.update(dt)
+        self._update_ai_vs_ai_timer(dt)
         self._poll_ai()
 
     def draw(self, surface: pygame.Surface) -> None:
@@ -110,36 +153,80 @@ class GameScene:
         self._draw_promotion_dialog(surface)
         self._draw_thinking(surface)
 
-    # ── estado da partida ─────────────────────────────────
+    # ── propriedades de modo de jogo ──────────────────────
+
+    @property
+    def _is_ai_turn(self) -> bool:
+        """True se o lado que joga agora é controlado por IA."""
+        if self.game.board.turn is chess.WHITE:
+            return self._white_is_ai
+        return self._black_is_ai
 
     @property
     def game_over(self) -> bool:
         return self.game.is_game_over()
+
+    # ── ciclo de vida ─────────────────────────────────────
 
     def new_game(self) -> None:
         self.game.reset()
         self.animator.clear()
         self.pending_promotion = None
         self._cancel_ai()
+        self._generation += 1
+        self._ai_vs_ai_timer = 0.0
         self._sync_view()
+        if self._is_ai_turn:
+            self._start_ai()
+
+    def on_exit(self) -> None:
+        """Chamado quando a cena sai da pilha (cancela IA ativa)."""
+        self._cancel_ai()
+
+    # ── desfazer e desistir ───────────────────────────────
 
     def undo(self) -> None:
-        # Se a IA está pensando, cancelar
+        # Cancelar IA ativa e limpar timer
         if self._ai_worker is not None and self._ai_worker.busy:
             self._cancel_ai()
-        # Se a IA jogou o último lance, desfazer 2 lances (IA + humano)
-        if (
-            self.ai_color is not None
-            and self.game.board.move_stack
-            and len(self.game.board.move_stack) >= 2
-        ):
-            self.game.undo()  # desfaz lance da IA
-            self.game.undo()  # desfaz lance do humano
-        else:
+        self._ai_vs_ai_timer = 0.0
+
+        if not self.game.board.move_stack:
+            return
+
+        # Determinar quantos lances desfazer:
+        #
+        # AI_VS_AI: sempre 2 (par IA+IA).
+        #
+        # HUMAN_VS_AI:
+        #   - Se a IA fez o último lance → desfaz 2 (IA + humano anterior).
+        #   - Se o humano fez o último lance → desfaz 1.
+        #
+        # HUMAN_VS_HUMAN: sempre 1.
+        undo_count = 1
+        if self.game_mode == GameMode.AI_VS_AI:
+            undo_count = 2
+        elif self._any_ai and self.game.board.move_stack:
+            # O último lance foi feito pela cor oposta ao turno atual.
+            last_mover_color = not self.game.board.turn
+            ai_played_last = (
+                last_mover_color is chess.WHITE and self._white_is_ai
+            ) or (
+                last_mover_color is chess.BLACK and self._black_is_ai
+            )
+            if ai_played_last:
+                undo_count = 2
+
+        for _ in range(min(undo_count, len(self.game.board.move_stack))):
             self.game.undo()
+
         self.animator.clear()
         self.pending_promotion = None
         self._sync_view()
+
+        # Reiniciar IA se necessário
+        if self._is_ai_turn:
+            self._start_ai()
 
     def resign(self) -> None:
         if not self.game.is_game_over():
@@ -150,15 +237,16 @@ class GameScene:
     # ── IA ────────────────────────────────────────────────
 
     def _cancel_ai(self) -> None:
+        """Cancela a busca de IA ativa e invalida resultados obsoletos."""
+        self._generation += 1
+        self._ai_vs_ai_timer = 0.0
         if self._ai_worker is not None:
             self._ai_worker.cancel()
             self._ai_worker = None
 
     def _start_ai(self) -> None:
         """Inicia a busca da IA no turno atual."""
-        if self.ai_color is None:
-            return
-        if self.game.board.turn != self.ai_color:
+        if not self._is_ai_turn:
             return
         if self.game.is_game_over():
             return
@@ -167,15 +255,41 @@ class GameScene:
         self._ai_worker.request()
 
     def _poll_ai(self) -> None:
-        """Verifica se a IA terminou de pensar."""
+        """Verifica se a IA terminou de pensar e aplica o lance."""
         if self._ai_worker is None:
             return
         if self._ai_worker.busy:
             return
+
+        gen = self._generation
         move = self._ai_worker.poll()
         self._ai_worker = None
+
+        # Resultado obsoleto (cena reiniciou ou cancelou) → ignorar.
+        if gen != self._generation:
+            return
+
         if move is not None and move in self.game.board.legal_moves:
             self._apply_move(move)
+            # No modo AI_VS_AI, agendar próximo lance com intervalo visual.
+            if (
+                self.game_mode == GameMode.AI_VS_AI
+                and not self.game.is_game_over()
+                and self._is_ai_turn
+            ):
+                self._ai_vs_ai_timer = self.ai_vs_ai_delay
+
+    def _update_ai_vs_ai_timer(self, dt: float) -> None:
+        """Decrementa o timer do modo AI_VS_AI e inicia a próxima IA."""
+        if self.game_mode != GameMode.AI_VS_AI:
+            return
+        if self._ai_vs_ai_timer <= 0.0:
+            return
+        self._ai_vs_ai_timer -= dt
+        if self._ai_vs_ai_timer <= 0.0:
+            self._ai_vs_ai_timer = 0.0
+            if self._is_ai_turn and not self._is_ai_thinking:
+                self._start_ai()
 
     def _draw_thinking(self, surface: pygame.Surface) -> None:
         """Indicador 'Pensando...' quando a IA está ativa."""
@@ -194,6 +308,15 @@ class GameScene:
             )
 
     # ── sincronização com a visão ─────────────────────────
+
+    def _setup_board_orientation(self) -> None:
+        """Configura a orientação inicial do tabuleiro conforme o modo."""
+        if self.game_mode == GameMode.HUMAN_VS_AI and (
+            self._white_is_ai and not self._black_is_ai
+        ):
+            # Humano joga de Pretas → tabuleiro invertido.
+            self.board_view.toggle_flip()
+        # HUMAN_VS_HUMAN e AI_VS_AI: orientação padrão.
 
     def _sync_view(self) -> None:
         self.board_view.set_board(self.game.board)
@@ -276,16 +399,20 @@ class GameScene:
             self.audio.play("check")
         if self.game.is_game_over():
             self.audio.play("game_over")
-        elif self.ai_color is not None and self.game.board.turn == self.ai_color:
-            self._start_ai()
 
     # ── interação ─────────────────────────────────────────
 
+    @property
     def _is_ai_thinking(self) -> bool:
         return self._ai_worker is not None and self._ai_worker.busy
 
+    @property
+    def _any_ai(self) -> bool:
+        """True se qualquer lado é controlado por IA."""
+        return self._white_is_ai or self._black_is_ai
+
     def _on_hover(self, pos: tuple[int, int]) -> None:
-        if self._is_ai_thinking() or self.game.is_game_over():
+        if self._is_ai_thinking or self.game.is_game_over():
             self.board_view.hover_square = None
             return
         self.board_view.hover_square = self.board_view.square_at(*pos)
@@ -294,12 +421,12 @@ class GameScene:
         if self.pending_promotion is not None:
             self._handle_promotion_click(pos)
             return
-        if self.animator.blocking or self._is_ai_thinking():
+        if self.animator.blocking or self._is_ai_thinking:
             return
         if self.game.is_game_over():
             return
         # Se é turno da IA, não permitir clique do humano
-        if self.ai_color is not None and self.game.board.turn == self.ai_color:
+        if self._is_ai_turn:
             return
 
         sq = self.board_view.square_at(pos[0], pos[1])
