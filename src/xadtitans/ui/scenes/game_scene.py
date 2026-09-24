@@ -5,13 +5,7 @@ from __future__ import annotations
 import chess
 import pygame
 
-from xadtitans.config import (
-    BOARD_SIZE,
-    BOARD_X,
-    BOARD_Y,
-    COLOR_BG,
-    SQUARE_SIZE,
-)
+from xadtitans.config import COLOR_BG
 from xadtitans.ui.board_view import BoardView, pixel_to_square
 
 
@@ -28,9 +22,8 @@ class GameScene:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             self._on_left_click(event.pos)
 
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_f:
-                self.board_view.toggle_flip()
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_f:
+            self.board_view.toggle_flip()
 
     def update(self, dt: float) -> None:
         pass  # Fase 1: nada animado ainda

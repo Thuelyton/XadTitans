@@ -7,7 +7,7 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 | Fase | Assunto | Status |
 |---|---|---|
 | 0 | Preparação | ✅ |
-| 1 | Tabuleiro na tela | 🟨 |
+| 1 | Tabuleiro na tela | ✅ |
 | 2 | Regras e jogabilidade | ⬜ |
 | 3 | Visual estilo Chess Titans | ⬜ |
 | 4 | Inteligência artificial | ⬜ |

@@ -9,7 +9,6 @@ import pytest
 from xadtitans.config import BOARD_X, BOARD_Y, SQUARE_SIZE
 from xadtitans.ui.board_view import pixel_to_square, square_to_pixel
 
-
 # ════════════════════════════════════════════════════════════
 # Helpers
 # ════════════════════════════════════════════════════════════

@@ -32,9 +32,10 @@ class App:
             dt = self.clock.tick(FPS_DEFAULT) / 1000.0
 
             for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                if (
+                    event.type == pygame.QUIT
+                    or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE)
+                ):
                     self.running = False
                 else:
                     self.scene.handle_event(event)

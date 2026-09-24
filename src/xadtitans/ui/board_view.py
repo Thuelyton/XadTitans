@@ -12,8 +12,6 @@ Este módulo pertence a ``ui/`` e pode usar pygame livremente.
 
 from __future__ import annotations
 
-from typing import Optional
-
 import chess
 import pygame
 
@@ -21,10 +19,13 @@ from xadtitans.config import (
     BOARD_SIZE,
     BOARD_X,
     BOARD_Y,
-    COLOR_BG,
     COLOR_COORD,
     COLOR_DARK_SQ,
+    COLOR_LAST_MOVE_DARK,
+    COLOR_LAST_MOVE_LIGHT,
     COLOR_LIGHT_SQ,
+    COLOR_SELECTED_DARK,
+    COLOR_SELECTED_LIGHT,
     SQUARE_SIZE,
 )
 
@@ -39,7 +40,7 @@ def pixel_to_square(
     board_y: int = BOARD_Y,
     sq_size: int = SQUARE_SIZE,
     flipped: bool = False,
-) -> Optional[int]:
+) -> int | None:
     """Retorna o square (0–63, constante ``chess.A1`` … ``chess.H8``)
     correspondente à posição em pixels, ou ``None`` se estiver fora
     do tabuleiro.
@@ -133,11 +134,11 @@ class BoardView:
         self.board: chess.Board = chess.Board()
 
         # Peça selecionada e lances legais (para futuras fases)
-        self.selected_square: Optional[int] = None
+        self.selected_square: int | None = None
         self.legal_destinations: list[int] = []
 
         # Último lance (para destaque visual)
-        self.last_move: Optional[chess.Move] = None
+        self.last_move: chess.Move | None = None
 
         # Fonte para coordenadas
         self._coord_font = pygame.font.SysFont("arial", 18, bold=True)
@@ -160,7 +161,7 @@ class BoardView:
                 surf = font.render("♔", True, (255, 255, 255))
                 if surf.get_width() > 4:
                     return font
-            except Exception:
+            except (TypeError, OSError):
                 continue
         # Fallback
         return pygame.font.Font(None, SQUARE_SIZE - 16)
