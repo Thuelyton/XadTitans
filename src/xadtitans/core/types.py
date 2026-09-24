@@ -15,6 +15,14 @@ if TYPE_CHECKING:
     import chess
 
 
+class GameMode(Enum):
+    """Modos de jogo suportados pelo XadTitans (usado a partir da Fase 5)."""
+
+    HUMAN_VS_HUMAN = auto()
+    HUMAN_VS_AI = auto()
+    AI_VS_AI = auto()
+
+
 class Level(Enum):
     """Níveis de dificuldade da IA (usado a partir da Fase 4)."""
 
