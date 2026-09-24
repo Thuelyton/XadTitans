@@ -4,12 +4,16 @@ Créditos e licenças dos assets (imagens, sons, fontes, ícones) usados no XadT
 
 | Asset | Fonte | Licença |
 |---|---|---|
-| Peças Unicode (♔♕♖♗♘♙♚♛♜♝♞♟) | Padrão Unicode (U+2654–U+265F); renderização via fonte do sistema | Uso livre (parte do padrão Unicode) |
-| Fontes do sistema (Segoe UI Symbol, Arial) | Microsoft Windows | Incluídas no sistema operacional |
+| Peças (12 sprites PNG, 256px) | Próprias — geradas proceduralmente por `tools/gen_pieces.py` (Pillow) | CC0 / domínio do projeto |
+| Tabuleiro em perspectiva (`board_perspective.png`, `squares.json`) | Próprio — gerado por `tools/gen_board.py` (Pillow, projeção pinhole) | CC0 / domínio do projeto |
+| Sons (`assets/sounds/*.wav`) | Próprios — sintetizados por `tools/gen_sounds.py` (osciladores + ruído) | CC0 / domínio do projeto |
+| Fontes do sistema (Arial, Segoe UI) | Microsoft Windows | Incluídas no sistema operacional |
 
-> **Nota:** As peças Unicode são um provisório para a Fase 1. Na Fase 3
-> serão substituídas por sprites próprios ou de licença aberta (CC0/CC-BY).
-> O código em ``ui/board_view.py`` já está preparado para a troca.
+> **Nota:** todos os assets visuais e sonoros são gerados por código no
+> repositório (`tools/`), sem depender de arquivos de terceiros — a
+> regeneração é determinística e a licença é irrestrita. As peças
+> Unicode da Fase 1/2 foram substituídas por sprites próprios na
+> Fase 3.
 
 Bibliotecas:
 
@@ -17,3 +21,4 @@ Bibliotecas:
 |---|---|
 | pygame | LGPL-2.1 (pygame-ce) / LGPL |
 | python-chess (chess) | GPL-3.0-or-later |
+| Pillow (só ferramentas de build) | HPND / MIT-CMU |

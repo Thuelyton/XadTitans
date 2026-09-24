@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pygame
 
+from xadtitans.audio import AudioManager
 from xadtitans.config import (
     FPS_DEFAULT,
     WINDOW_HEIGHT,
@@ -24,8 +25,12 @@ class App:
         self.clock = pygame.time.Clock()
         self.running = True
 
+        self.audio = AudioManager()
+        self.show_fps = False
+        self._fps_font = pygame.font.SysFont("arial", 16, bold=True)
+
         # Cena atual (GameScene ou FimDePartida)
-        self.scene: GameScene | EndgameScene = GameScene()
+        self.scene: GameScene | EndgameScene = GameScene(self.audio)
 
     def run(self) -> int:
         """Executa o loop até o usuário fechar. Retorna 0."""
@@ -35,19 +40,34 @@ class App:
             for event in pygame.event.get():
                 if (
                     event.type == pygame.QUIT
-                    or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE)
+                    or (
+                        event.type == pygame.KEYDOWN
+                        and event.key == pygame.K_ESCAPE
+                    )
                 ):
                     self.running = False
+                elif (
+                    event.type == pygame.KEYDOWN and event.key == pygame.K_F3
+                ):
+                    self.show_fps = not self.show_fps
                 else:
                     self.scene.handle_event(event)
 
             self._switch_scenes_if_needed()
             self.scene.update(dt)
             self.scene.draw(self.screen)
+            if self.show_fps:
+                self._draw_fps()
             pygame.display.flip()
 
         pygame.quit()
         return 0
+
+    def _draw_fps(self) -> None:
+        fps = self.clock.get_fps()
+        color = (80, 220, 80) if fps >= 30 else (240, 90, 60)
+        text = self._fps_font.render(f"{fps:5.1f} FPS", True, color)
+        self.screen.blit(text, (8, WINDOW_HEIGHT - 24))
 
     def _switch_scenes_if_needed(self) -> None:
         """Troca de cena: fim de partida ↔ nova partida."""

@@ -9,7 +9,7 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 | 0 | Preparação | ✅ |
 | 1 | Tabuleiro na tela | ✅ |
 | 2 | Regras e jogabilidade | ✅ |
-| 3 | Visual estilo Chess Titans | ⬜ |
+| 3 | Visual estilo Chess Titans | ✅ |
 | 4 | Inteligência artificial | ⬜ |
 | 5 | Recursos do jogo | ⬜ |
 | 6 | Qualidade e desempenho | ⬜ |
@@ -86,26 +86,26 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 
 ## FASE 3 — Visual estilo Chess Titans
 
-- [ ] Definir o conjunto de peças final (próprio ou de licença aberta) e registrar no `CREDITS.md`
-- [ ] Criar `tools/gen_board.py` (Pillow) que gera `board_perspective.png` e `squares.json` (centro e escala de cada casa)
-- [ ] `BoardView` usando `squares.json` para posicionar as peças
-- [ ] Escala das peças por fileira (mais longe = menor)
-- [ ] Ordem de desenho de trás para frente
-- [ ] Sombras sob as peças
-- [ ] Destaque da casa selecionada (brilho)
-- [ ] Destaque dos movimentos legais (ponto para casa vazia, anel para captura)
-- [ ] Destaque do último lance
-- [ ] Brilho vermelho no rei em xeque
-- [ ] Hover (casa sob o mouse)
-- [ ] Módulo `animations.py` (tween e easing)
-- [ ] Animação de deslize das peças e esmaecer na captura
-- [ ] Bloquear entrada do jogador durante a animação
-- [ ] `audio.py` e sons: mover, capturar, xeque, fim de jogo, clique
-- [ ] Fundo e moldura do tabuleiro (mármore ou madeira)
-- [ ] Painel lateral: lista de jogadas com rolagem, peças capturadas
-- [ ] Cache de todos os sprites escalados na inicialização
-- [ ] Medir o FPS no PC alvo (meta: 30 ou mais) e otimizar se preciso
-- [ ] Commit da fase
+- [x] Definir o conjunto de peças final (próprio ou de licença aberta) e registrar no `CREDITS.md`
+- [x] Criar `tools/gen_board.py` (Pillow) que gera `board_perspective.png` e `squares.json` (centro e escala de cada casa)
+- [x] `BoardView` usando `squares.json` para posicionar as peças
+- [x] Escala das peças por fileira (mais longe = menor)
+- [x] Ordem de desenho de trás para frente
+- [x] Sombras sob as peças
+- [x] Destaque da casa selecionada (brilho)
+- [x] Destaque dos movimentos legais (ponto para casa vazia, anel para captura)
+- [x] Destaque do último lance
+- [x] Brilho vermelho no rei em xeque
+- [x] Hover (casa sob o mouse)
+- [x] Módulo `animations.py` (tween e easing)
+- [x] Animação de deslize das peças e esmaecer na captura
+- [x] Bloquear entrada do jogador durante a animação
+- [x] `audio.py` e sons: mover, capturar, xeque, fim de jogo, clique
+- [x] Fundo e moldura do tabuleiro (mármore ou madeira)
+- [x] Painel lateral: lista de jogadas com rolagem, peças capturadas
+- [x] Cache de todos os sprites escalados na inicialização
+- [x] Medir o FPS no PC alvo (meta: 30 ou mais) e otimizar se preciso
+- [x] Commit da fase
 
 **Pronto quando:** o jogo tem a aparência final, com animações e sons, e mantém 30 FPS no PC alvo.
 

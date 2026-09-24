@@ -19,6 +19,6 @@ def resource_path(relative: str | Path) -> Path:
     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
         base = Path(sys._MEIPASS)          # type: ignore[attr-defined]
     else:
-        # Raiz do repositório (uma pasta acima de src/)
-        base = Path(__file__).resolve().parent.parent.parent
+        # Raiz do repositório (src/xadtitans/utils/ → 3 pastas acima)
+        base = Path(__file__).resolve().parent.parent.parent.parent
     return base / Path(relative)

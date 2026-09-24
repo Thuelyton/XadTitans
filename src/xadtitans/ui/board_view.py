@@ -1,10 +1,14 @@
-"""Visão do tabuleiro de xadrez.
+"""Visão do tabuleiro em perspectiva (estilo Chess Titans).
 
 Este módulo fornece:
-  - Funções **puras** (sem pygame) de conversão pixel ↔ casa,
-    usadas em testes e na interface.
-  - ``BoardView``, que usa pygame para desenhar o tabuleiro,
-    coordenadas e peças (provisoriamente em Unicode).
+  - Funções **puras** (sem pygame) de conversão pixel ↔ casa do
+    tabuleiro **plano** — legado da Fase 1, mantidas (com seus
+    testes) como utilitário;
+  - ``BoardView``: desenha o tabuleiro em perspectiva
+    (``assets/board/board_perspective.png`` + ``squares.json``),
+    as peças em sprite (``assets/pieces/``) com escala por fileira,
+    sombras, destaques (seleção, lances legais, último lance, xeque,
+    hover) e animações, de trás para frente.
 
 **Importante:** ``core/`` e ``ai/`` não importam ``pygame``.
 Este módulo pertence a ``ui/`` e pode usar pygame livremente.
@@ -12,26 +16,26 @@ Este módulo pertence a ``ui/`` e pode usar pygame livremente.
 
 from __future__ import annotations
 
+import math
+
 import chess
 import pygame
 
 from xadtitans.config import (
-    BOARD_SIZE,
+    BOARD_IMG_H,
+    BOARD_IMG_W,
+    BOARD_PERSP_X,
+    BOARD_PERSP_Y,
     BOARD_X,
     BOARD_Y,
-    COLOR_CHECK_GLOW,
-    COLOR_COORD,
-    COLOR_DARK_SQ,
-    COLOR_LAST_MOVE_DARK,
-    COLOR_LAST_MOVE_LIGHT,
-    COLOR_LIGHT_SQ,
-    COLOR_SELECTED_DARK,
-    COLOR_SELECTED_LIGHT,
     SQUARE_SIZE,
 )
+from xadtitans.ui.animations import Anim
+from xadtitans.ui.board_map import BoardMap
+from xadtitans.utils.resources import resource_path
 
 # ════════════════════════════════════════════════════════════
-# Conversões puras (sem pygame) — testáveis independentemente
+# Conversões puras do tabuleiro PLANO (legado da Fase 1)
 # ════════════════════════════════════════════════════════════
 
 def pixel_to_square(
@@ -89,110 +93,140 @@ def square_to_pixel(
 
 
 # ════════════════════════════════════════════════════════════
-# Peças Unicode (provisório — preparado para trocar por sprites)
+# BoardView em perspectiva
 # ════════════════════════════════════════════════════════════
 
-_UNICODE_PIECES: dict[tuple[int, bool], str] = {
-    # (piece_type, is_white) → símbolo Unicode
-    (chess.PAWN, True): "♙",
-    (chess.KNIGHT, True): "♘",
-    (chess.BISHOP, True): "♗",
-    (chess.ROOK, True): "♖",
-    (chess.QUEEN, True): "♕",
-    (chess.KING, True): "♔",
-    (chess.PAWN, False): "♟",
-    (chess.KNIGHT, False): "♞",
-    (chess.BISHOP, False): "♝",
-    (chess.ROOK, False): "♜",
-    (chess.QUEEN, False): "♛",
-    (chess.KING, False): "♚",
-}
+# Fração do canvas 256px ocupada pela peça (~121px) → o canvas é
+# exibido com ~2.02 × a largura da casa para a peça ocupar ~95%.
+_PIECE_FACTOR = 256 / 121 * 0.95
 
-# Fontes do sistema que contêm símbolos de xadrez (ordem de tentativa)
-_CHESS_FONTS = ["segoeuisymbol", "arial unicode ms", "arial", None]
+# Âncora do sprite: ponto de apoio da peça no canvas 256×256.
+_ANCHOR_X = 128 / 256
+_ANCHOR_Y = 244 / 256
 
-# Cores para renderização das peças Unicode
-_PIECE_COLOR_WHITE = (255, 255, 255)
-_PIECE_COLOR_BLACK = (30, 30, 30)
-_PIECE_SHADOW_WHITE = (0, 0, 0)
-_PIECE_SHADOW_BLACK = (220, 220, 220)
+# Quantização de tamanho p/ cache de sprites durante animações.
+_SIZE_STEP = 4
+
+# Cores dos destaques (RGBA)
+_C_SELECTED = (255, 244, 130, 105)
+_C_LAST_MOVE = (230, 195, 70, 80)
+_C_CHECK = (235, 64, 52, 130)
+_C_HOVER = (255, 255, 255, 55)
+_C_DOT = (40, 30, 20, 130)
+_C_RING = (40, 30, 20, 150)
+_C_SHADOW = (0, 0, 0, 80)
 
 
-def _unicode_symbol(piece: chess.Piece) -> str:
-    """Retorna o caractere Unicode para uma peça."""
-    return _UNICODE_PIECES[(piece.piece_type, piece.color)]
+def _load_image(path) -> pygame.Surface:
+    """Carrega PNG com convert_alpha quando possível."""
+    surf = pygame.image.load(str(path))
+    try:
+        return surf.convert_alpha()
+    except pygame.error:
+        return surf
 
-
-# ════════════════════════════════════════════════════════════
-# BoardView — desenha tabuleiro, coordenadas e peças
-# ════════════════════════════════════════════════════════════
 
 class BoardView:
-    """Responsável por desenhar o tabuleiro e as peças na tela."""
+    """Desenha o tabuleiro em perspectiva, peças e destaques."""
 
     def __init__(self) -> None:
         self.flipped = False
-        self.board: chess.Board = chess.Board()
 
-        # Peça selecionada e lances legais (para futuras fases)
+        base_map = BoardMap.load(resource_path("assets/board/squares.json"))
+        self._base_map = base_map
+        self._map = base_map
+
+        self._board_img = _load_image(
+            resource_path("assets/board/board_perspective.png")
+        )
+        if self._board_img.get_size() != (BOARD_IMG_W, BOARD_IMG_H):
+            self._board_img = pygame.transform.smoothscale(
+                self._board_img, (BOARD_IMG_W, BOARD_IMG_H)
+            )
+
+        # Largura da casa mais próxima (referência de escala das peças)
+        a1 = self._base_map.polygon(chess.A1)
+        self._base_cell_w = a1[1][0] - a1[0][0]
+
+        # Cache de sprites: (piece_type, is_white, size) → Surface
+        self._sprites: dict[tuple[int, bool, int], pygame.Surface] = {}
+        self._shadows: dict[int, pygame.Surface] = {}
+        self._build_cache()
+
+        # Estado de destaque (preenchido pela cena)
         self.selected_square: int | None = None
         self.legal_destinations: list[int] = []
-
-        # Último lance (para destaque visual)
         self.last_move: chess.Move | None = None
-
-        # Rei em xeque (para destaque visual, Fase 2)
         self.check_square: int | None = None
+        self.hover_square: int | None = None
 
-        # Fonte para coordenadas
-        self._coord_font = pygame.font.SysFont("arial", 18, bold=True)
+        # Tabuleiro (cópia só para consulta de peças)
+        self.board: chess.Board = chess.Board()
 
-        # Fonte para peças Unicode
-        self._piece_font = self._load_piece_font()
+    # ── cache de sprites ─────────────────────────────────
 
-        # Cache de superfícies de peça (pre-criadas)
-        self._piece_cache: dict[tuple[int, bool], pygame.Surface] = {}
+    def _sprite_size(self, scale: float) -> int:
+        """Largura exibida do canvas 256px para a escala dada."""
+        return max(
+            _SIZE_STEP,
+            int(self._base_cell_w * scale * _PIECE_FACTOR)
+            // _SIZE_STEP * _SIZE_STEP,
+        )
 
-    # ── carregamento ─────────────────────────────────────
+    def _build_cache(self) -> None:
+        """Pré-renderiza todos os sprites nas 8 escalas de fileira."""
+        for rank in range(8):
+            size = self._sprite_size(self._base_map.scale(rank * 8))
+            for piece_type in chess.PIECE_TYPES:
+                for color in (True, False):
+                    self._sprite(piece_type, color, size)
+            self._shadow(size)
 
-    @staticmethod
-    def _load_piece_font() -> pygame.font.Font:
-        """Tenta carregar uma fonte com suporte a Unicode chess."""
-        for name in _CHESS_FONTS:
-            try:
-                font = pygame.font.SysFont(name, SQUARE_SIZE - 16)
-                # Testa se renderiza o símbolo do rei branco
-                surf = font.render("♔", True, (255, 255, 255))
-                if surf.get_width() > 4:
-                    return font
-            except (TypeError, OSError):
-                continue
-        # Fallback
-        return pygame.font.Font(None, SQUARE_SIZE - 16)
+    def _sprite_path(self, piece_type: int, color: bool) -> object:
+        name = chess.piece_name(piece_type)
+        return resource_path("assets/pieces") / (
+            f"{'white' if color else 'black'}_{name}.png"
+        )
 
-    def _build_piece_cache(self) -> None:
-        """Pré-renderiza todas as peças Unicode em tamanho de cache."""
-        for piece_type in chess.PIECE_TYPES:
-            for color in (True, False):
-                key = (piece_type, color)
-                if key in self._piece_cache:
-                    continue
-                symbol = _UNICODE_PIECES[key]
-                color_rgb = _PIECE_COLOR_WHITE if color else _PIECE_COLOR_BLACK
-                shadow_rgb = _PIECE_SHADOW_WHITE if color else _PIECE_SHADOW_BLACK
-                # Sombra
-                shadow = self._piece_font.render(symbol, True, shadow_rgb)
-                # Peça
-                piece_surf = self._piece_font.render(symbol, True, color_rgb)
-                # Surface combinada
-                w = max(shadow.get_width(), piece_surf.get_width()) + 4
-                h = max(shadow.get_height(), piece_surf.get_height()) + 4
-                combined = pygame.Surface((w, h), pygame.SRCALPHA)
-                combined.blit(shadow, (2, 2))
-                combined.blit(piece_surf, (0, 0))
-                self._piece_cache[key] = combined
+    def _raw_sprites(self) -> dict[tuple[int, bool], pygame.Surface]:
+        if not hasattr(self, "_raw"):
+            self._raw = {
+                (pt, c): _load_image(self._sprite_path(pt, c))
+                for pt in chess.PIECE_TYPES
+                for c in (True, False)
+            }
+        return self._raw
 
-    # ── configuração ─────────────────────────────────────
+    def _sprite(self, piece_type: int, color: bool, size: int) -> pygame.Surface:
+        """Sprite em tamanho (com cache; quantizado em _SIZE_STEP)."""
+        size = max(_SIZE_STEP, size // _SIZE_STEP * _SIZE_STEP)
+        key = (piece_type, color, size)
+        cached = self._sprites.get(key)
+        if cached is None:
+            raw = self._raw_sprites()[(piece_type, color)]
+            cached = pygame.transform.smoothscale(
+                raw, (size, size * raw.get_height() // raw.get_width())
+            )
+            self._sprites[key] = cached
+        return cached
+
+    def get_sprite(
+        self, piece_type: int, color: bool, size: int
+    ) -> pygame.Surface:
+        """Sprite público (usado pelo painel lateral, diálogo etc.)."""
+        return self._sprite(piece_type, color, size)
+
+    def _shadow(self, size: int) -> pygame.Surface:
+        size = max(_SIZE_STEP, size // _SIZE_STEP * _SIZE_STEP)
+        cached = self._shadows.get(size)
+        if cached is None:
+            w, h = int(size * 0.52), max(4, int(size * 0.14))
+            cached = pygame.Surface((w, h), pygame.SRCALPHA)
+            pygame.draw.ellipse(cached, _C_SHADOW, (0, 0, w, h))
+            self._shadows[size] = cached
+        return cached
+
+    # ── estado ───────────────────────────────────────────
 
     def set_board(self, board: chess.Board) -> None:
         """Define a posição a ser exibida."""
@@ -201,149 +235,188 @@ class BoardView:
         self.legal_destinations = []
 
     def toggle_flip(self) -> None:
-        """Inverte a orientação do tabuleiro."""
+        """Inverte a orientação do tabuleiro (rotação de 180°)."""
         self.flipped = not self.flipped
+        self._map = self._base_map.flipped() if self.flipped else self._base_map
+
+    def square_at(self, px: float, py: float) -> int | None:
+        """Casa sob o pixel da TELA (não da imagem do tabuleiro)."""
+        return self._map.square_at(
+            px - BOARD_PERSP_X, py - BOARD_PERSP_Y
+        )
 
     # ── desenho ──────────────────────────────────────────
 
-    def draw(self, surface: pygame.Surface) -> None:
-        """Desenha o tabuleiro completo: casas, coordenadas e peças."""
-        self._build_piece_cache()
-        self._draw_squares(surface)
-        self._draw_highlights(surface)
-        self._draw_coordinates(surface)
-        self._draw_pieces(surface)
+    def draw(
+        self,
+        surface: pygame.Surface,
+        anims: dict[int, list[Anim]] | None = None,
+    ) -> None:
+        """Desenha tabuleiro, destaques e peças (de trás p/ frente)."""
+        surface.blit(self._board_img, (BOARD_PERSP_X, BOARD_PERSP_Y))
+        anims = anims or {}
 
-    def _draw_squares(self, surface: pygame.Surface) -> None:
-        """Desenha as 64 casas do tabuleiro."""
-        for sq in range(64):
-            file_ = chess.square_file(sq)
-            rank = chess.square_rank(sq)
-            is_light = (file_ + rank) % 2 == 0
-            color = COLOR_LIGHT_SQ if is_light else COLOR_DARK_SQ
-            if self.flipped:
-                col = 7 - file_
-                row = rank
-            else:
-                col = file_
-                row = 7 - rank
-            rect = pygame.Rect(
-                BOARD_X + col * SQUARE_SIZE,
-                BOARD_Y + row * SQUARE_SIZE,
-                SQUARE_SIZE,
-                SQUARE_SIZE,
-            )
-            pygame.draw.rect(surface, color, rect)
+        self._draw_last_move(surface)
+        self._draw_selected(surface)
+        self._draw_check(surface)
+        self._draw_legal(surface)
+        self._draw_hover(surface)
 
-    def _draw_highlights(self, surface: pygame.Surface) -> None:
-        """Destaca o último lance e a casa selecionada."""
-        # Destaque do último lance
+        # Peças estáticas: trás → frente, pulando casas animadas
+        for sq in self._map.draw_order():
+            if sq in anims:
+                continue
+            piece = self.board.piece_at(sq)
+            if piece is not None:
+                self._draw_piece(surface, piece, sq)
+
+        # Peças animadas: fades por baixo, deslizes por cima
+        anim_list = [a for group in anims.values() for a in group]
+        for a in sorted(anim_list, key=lambda a: (a.kind != "fade", a.pos[1])):
+            self._draw_anim(surface, a)
+
+    # ── destaques ────────────────────────────────────────
+
+    def _overlay(self, surface: pygame.Surface, sq: int, color) -> None:
+        """Preenche o polígono da casa com cor RGBA."""
+        poly = [
+            (x + BOARD_PERSP_X, y + BOARD_PERSP_Y)
+            for x, y in self._map.polygon(sq)
+        ]
+        xs = [p[0] for p in poly]
+        ys = [p[1] for p in poly]
+        rect = pygame.Rect(
+            int(min(xs)), int(min(ys)),
+            int(max(xs) - min(xs)) + 2, int(max(ys) - min(ys)) + 2,
+        )
+        tile = pygame.Surface(rect.size, pygame.SRCALPHA)
+        # desloca o polígono para a origem do tile
+        local = [(p[0] - rect.x, p[1] - rect.y) for p in poly]
+        pygame.draw.polygon(tile, color, local)
+        surface.blit(tile, rect.topleft)
+
+    def _center(self, sq: int) -> tuple[float, float]:
+        cx, cy = self._map.center(sq)
+        return cx + BOARD_PERSP_X, cy + BOARD_PERSP_Y
+
+    def _cell_w(self, sq: int) -> float:
+        poly = self._map.polygon(sq)
+        return (poly[1][0] - poly[0][0] + poly[2][0] - poly[3][0]) / 2.0
+
+    def _draw_last_move(self, surface: pygame.Surface) -> None:
         if self.last_move is not None:
             for sq in (self.last_move.from_square, self.last_move.to_square):
-                file_ = chess.square_file(sq)
-                rank = chess.square_rank(sq)
-                is_light = (file_ + rank) % 2 == 0
-                color = COLOR_LAST_MOVE_LIGHT if is_light else COLOR_LAST_MOVE_DARK
-                x, y = square_to_pixel(
-                    sq, BOARD_X, BOARD_Y, SQUARE_SIZE, self.flipped
-                )
-                rect = pygame.Rect(
-                    x - SQUARE_SIZE // 2,
-                    y - SQUARE_SIZE // 2,
-                    SQUARE_SIZE,
-                    SQUARE_SIZE,
-                )
-                pygame.draw.rect(surface, color, rect)
+                self._overlay(surface, sq, _C_LAST_MOVE)
 
-        # Destaque da casa selecionada
+    def _draw_selected(self, surface: pygame.Surface) -> None:
         if self.selected_square is not None:
-            sq = self.selected_square
-            file_ = chess.square_file(sq)
-            rank = chess.square_rank(sq)
-            is_light = (file_ + rank) % 2 == 0
-            color = COLOR_SELECTED_LIGHT if is_light else COLOR_SELECTED_DARK
-            x, y = square_to_pixel(
-                sq, BOARD_X, BOARD_Y, SQUARE_SIZE, self.flipped
-            )
-            rect = pygame.Rect(
-                x - SQUARE_SIZE // 2,
-                y - SQUARE_SIZE // 2,
-                SQUARE_SIZE,
-                SQUARE_SIZE,
-            )
-            pygame.draw.rect(surface, color, rect)
+            self._overlay(surface, self.selected_square, _C_SELECTED)
 
-        # Brilho vermelho no rei em xeque (retângulo semitransparente)
+    def _draw_check(self, surface: pygame.Surface) -> None:
         if self.check_square is not None:
-            sq = self.check_square
-            x, y = square_to_pixel(
-                sq, BOARD_X, BOARD_Y, SQUARE_SIZE, self.flipped
+            t = pygame.time.get_ticks() / 1000.0
+            pulse = 0.75 + 0.25 * (0.5 + 0.5 * math.sin(t * 5.0))
+            color = (
+                _C_CHECK[0], _C_CHECK[1], _C_CHECK[2],
+                int(_C_CHECK[3] * pulse),
             )
-            glow = pygame.Surface((SQUARE_SIZE, SQUARE_SIZE), pygame.SRCALPHA)
-            glow.fill(COLOR_CHECK_GLOW)
-            surface.blit(glow, (x - SQUARE_SIZE // 2, y - SQUARE_SIZE // 2))
+            self._overlay(surface, self.check_square, color)
 
-        # Pontos nos destinos legais
-        for dest in self.legal_destinations:
-            piece = self.board.piece_at(dest)
-            cx, cy = square_to_pixel(
-                dest, BOARD_X, BOARD_Y, SQUARE_SIZE, self.flipped
-            )
-            if piece is not None:
+    def _draw_legal(self, surface: pygame.Surface) -> None:
+        for sq in self.legal_destinations:
+            cx, cy = self._center(sq)
+            w = self._cell_w(sq)
+            if self.board.piece_at(sq) is not None:
                 # Anel de captura
-                pygame.draw.circle(
-                    surface,
-                    (100, 100, 100),
-                    (cx, cy),
-                    SQUARE_SIZE // 2,
-                    4,
-                )
+                radius = int(w * 0.44)
+                _ring(surface, (cx, cy), radius, _C_RING, max(3, w * 0.06))
             else:
                 # Ponto central
-                pygame.draw.circle(
-                    surface,
-                    (100, 100, 100),
-                    (cx, cy),
-                    SQUARE_SIZE // 8,
-                )
+                radius = int(w * 0.11)
+                _dot(surface, (cx, cy), radius, _C_DOT)
 
-    def _draw_coordinates(self, surface: pygame.Surface) -> None:
-        """Desenha as coordenadas (a–h e 1–8) ao redor do tabuleiro."""
-        files = "abcdefgh"
-        ranks = "87654321"
+    def _draw_hover(self, surface: pygame.Surface) -> None:
+        if (
+            self.hover_square is not None
+            and self.hover_square != self.selected_square
+        ):
+            poly = [
+                (x + BOARD_PERSP_X, y + BOARD_PERSP_Y)
+                for x, y in self._map.polygon(self.hover_square)
+            ]
+            pygame.draw.polygon(surface, _C_HOVER, poly, 2)
 
-        if self.flipped:
-            files = files[::-1]
-            ranks = ranks[::-1]
+    # ── peças ────────────────────────────────────────────
 
-        # Letras (abaixo do tabuleiro)
-        for i, letter in enumerate(files):
-            x = BOARD_X + i * SQUARE_SIZE + SQUARE_SIZE // 2
-            y = BOARD_Y + BOARD_SIZE + 4
-            text = self._coord_font.render(letter, True, COLOR_COORD)
-            surface.blit(text, (x - text.get_width() // 2, y))
+    def _foot(self, sq: int) -> tuple[float, float]:
+        """Ponto de apoio da peça: centro da casa + leve offset p/ baixo."""
+        cx, cy = self._center(sq)
+        poly = self._map.polygon(sq)
+        near_y = (poly[0][1] + poly[1][1]) / 2.0
+        far_y = (poly[2][1] + poly[3][1]) / 2.0
+        return cx, cy + (near_y - far_y) * 0.16
 
-        # Números (à esquerda do tabuleiro)
-        for i, digit in enumerate(ranks):
-            x = BOARD_X - 22
-            y = BOARD_Y + i * SQUARE_SIZE + SQUARE_SIZE // 2
-            text = self._coord_font.render(digit, True, COLOR_COORD)
-            surface.blit(text, (x, y - text.get_height() // 2))
+    def piece_anchor(self, sq: int) -> tuple[float, float]:
+        """Ponto de apoio da peça na casa (coords da TELA; p/ animações)."""
+        return self._foot(sq)
 
-    def _draw_pieces(self, surface: pygame.Surface) -> None:
-        """Desenha as peças usando Unicode (provisório)."""
-        for sq in range(64):
-            piece = self.board.piece_at(sq)
-            if piece is None:
-                continue
-            key = (piece.piece_type, piece.color)
-            cached = self._piece_cache.get(key)
-            if cached is None:
-                continue
-            cx, cy = square_to_pixel(
-                sq, BOARD_X, BOARD_Y, SQUARE_SIZE, self.flipped
-            )
-            surface.blit(
-                cached,
-                (cx - cached.get_width() // 2, cy - cached.get_height() // 2),
-            )
+    def scale_of(self, sq: int) -> float:
+        """Escala da peça na casa (p/ animações entre fileiras)."""
+        return self._map.scale(sq)
+
+    def _draw_piece(
+        self,
+        surface: pygame.Surface,
+        piece: chess.Piece,
+        sq: int,
+        pos: tuple[float, float] | None = None,
+        scale: float | None = None,
+        alpha: float = 1.0,
+    ) -> None:
+        if scale is None:
+            scale = self._map.scale(sq)
+        size = self._sprite_size(scale)
+        sprite = self._sprite(piece.piece_type, piece.color, size)
+        shadow = self._shadow(size)
+        fx, fy = pos if pos is not None else self._foot(sq)
+        x = fx - size * _ANCHOR_X
+        y = fy - size * _ANCHOR_Y
+        surface.blit(
+            shadow,
+            (x + size * 0.24, fy - shadow.get_height() * 0.55),
+        )
+        if alpha < 1.0:
+            sprite = sprite.copy()
+            sprite.set_alpha(int(alpha * 255))
+        surface.blit(sprite, (x, y))
+
+    def _draw_anim(self, surface: pygame.Surface, a: Anim) -> None:
+        piece = chess.Piece(a.sprite[0], a.sprite[1])
+        self._draw_piece(
+            surface, piece, a.square, pos=a.pos, scale=a.scale, alpha=a.alpha
+        )
+
+
+# ── primitivas com alfa ─────────────────────────────────
+
+def _dot(
+    surface: pygame.Surface, pos: tuple[float, float], radius: int, color
+) -> None:
+    dot = pygame.Surface((radius * 2 + 2, radius * 2 + 2), pygame.SRCALPHA)
+    pygame.draw.circle(dot, color, (radius + 1, radius + 1), radius)
+    surface.blit(dot, (pos[0] - radius - 1, pos[1] - radius - 1))
+
+
+def _ring(
+    surface: pygame.Surface,
+    pos: tuple[float, float],
+    radius: int,
+    color,
+    width: float,
+) -> None:
+    size = radius * 2 + int(width) * 2 + 4
+    ring = pygame.Surface((size, size), pygame.SRCALPHA)
+    pygame.draw.circle(
+        ring, color, (size // 2, size // 2), radius, max(2, int(width))
+    )
+    surface.blit(ring, (pos[0] - size // 2, pos[1] - size // 2))
