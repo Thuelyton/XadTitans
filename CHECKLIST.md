@@ -7,7 +7,7 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 | Fase | Assunto | Status |
 |---|---|---|
 | 0 | Preparação | ✅ |
-| 1 | Tabuleiro na tela | ⬜ |
+| 1 | Tabuleiro na tela | 🟨 |
 | 2 | Regras e jogabilidade | ⬜ |
 | 3 | Visual estilo Chess Titans | ⬜ |
 | 4 | Inteligência artificial | ⬜ |
@@ -43,15 +43,15 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 
 ## FASE 1 — Tabuleiro na tela
 
-- [ ] `config.py` com resolução, FPS, cores e caminhos
-- [ ] `utils/resources.py` com `resource_path()` (funciona no desenvolvimento e no PyInstaller)
-- [ ] `utils/logger.py` gravando em arquivo
-- [ ] Loop principal em `app.py` com limite de FPS, `dt` e encerramento limpo
-- [ ] Desenhar o tabuleiro 8×8 plano com as coordenadas (a–h, 1–8)
-- [ ] Carregar as imagens das peças (conjunto provisório com licença aberta, registrado no `CREDITS.md`)
-- [ ] Desenhar a posição inicial a partir de um FEN
-- [ ] Converter pixel em casa e casa em pixel (tabuleiro normal e virado)
-- [ ] Teste: ida e volta pixel↔casa para as 64 casas, nas duas orientações
+- [x] `config.py` com resolução, FPS, cores e caminhos
+- [x] `utils/resources.py` com `resource_path()` (funciona no desenvolvimento e no PyInstaller)
+- [x] `utils/logger.py` gravando em arquivo
+- [x] Loop principal em `app.py` com limite de FPS, `dt` e encerramento limpo
+- [x] Desenhar o tabuleiro 8×8 plano com as coordenadas (a–h, 1–8)
+- [x] Carregar as imagens das peças (conjunto provisório com licença aberta, registrado no `CREDITS.md`)
+- [x] Desenhar a posição inicial a partir de um FEN
+- [x] Converter pixel em casa e casa em pixel (tabuleiro normal e virado)
+- [x] Teste: ida e volta pixel↔casa para as 64 casas, nas duas orientações
 
 **Pronto quando:** a posição inicial aparece correta e o clique identifica a casa certa.
 

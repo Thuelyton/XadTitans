@@ -1,38 +1,23 @@
 """XadTitans - ponto de entrada.
 
-Abre a janela principal (1024x768) e fecha com Esc ou no X da janela.
+Abre a janela principal (1024×768) e fecha com Esc ou no X da janela.
 """
 
 import sys
+from pathlib import Path
 
-import pygame
+# Garante que o pacote xadtitans/ é encontrado mesmo fora de um
+# instalação em modo editable (pip install -e .).
+_src = str(Path(__file__).resolve().parent / "src")
+if _src not in sys.path:
+    sys.path.insert(0, _src)
 
-TITLE = "XadTitans"
-WIDTH = 1024
-HEIGHT = 768
-FPS = 30
+from xadtitans.app import App
 
 
 def main() -> int:
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption(TITLE)
-    clock = pygame.time.Clock()
-
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                running = False
-
-        screen.fill((16, 20, 26))
-        pygame.display.flip()
-        clock.tick(FPS)
-
-    pygame.quit()
-    return 0
+    app = App()
+    return app.run()
 
 
 if __name__ == "__main__":
