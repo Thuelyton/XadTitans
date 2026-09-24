@@ -6,7 +6,7 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 
 | Fase | Assunto | Status |
 |---|---|---|
-| 0 | Preparação | 🟨 falta GitHub + push |
+| 0 | Preparação | ✅ |
 | 1 | Tabuleiro na tela | ⬜ |
 | 2 | Regras e jogabilidade | ⬜ |
 | 3 | Visual estilo Chess Titans | ⬜ |
@@ -24,7 +24,7 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 - [x] Descobrir a versão do Windows do PC alvo (Windows 10, build 19045 = 22H2)
 - [x] Escolher a versão do Python (Windows 10 → **Python 3.12.10**, já instalado)
 - [x] Instalar Python e Git; conferir com `python --version` e `git --version`
-- [ ] Criar o repositório no GitHub (`XadTitans`)
+- [x] Criar o repositório no GitHub (`XadTitans`)
 - [x] Adicionar `.gitignore` de Python (incluir `.venv/`, `build/`, `dist/`, `__pycache__/`)
 - [x] Adicionar `LICENSE` (GPL-3.0, ver seção 16 do README)
 - [x] Criar o ambiente virtual: `python -m venv .venv` e ativá-lo
@@ -35,7 +35,7 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 - [x] Criar `CREDITS.md` e `CHANGELOG.md` (vazios, com título)
 - [x] `main.py` abre uma janela 1024×768 com o título "XadTitans" e fecha com `Esc`
 - [x] Criar `pytest.ini` e um teste simples que passa
-- [ ] Primeiro commit e push
+- [x] Primeiro commit e push
 
 **Pronto quando:** a janela vazia abre e fecha, `pytest` passa e o repositório está no GitHub.
 
