@@ -1,0 +1,5 @@
+# XadTitans - dependências de execução
+# Python alvo: 3.12.10 (Windows 10 ou mais novo)
+# Instalar com: pip install -r requirements.txt
+pygame==2.6.1
+chess==1.11.2

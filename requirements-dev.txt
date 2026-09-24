@@ -1,0 +1,7 @@
+# XadTitans - dependências de desenvolvimento
+# Instalar com: pip install -r requirements-dev.txt
+-r requirements.txt
+pytest==9.1.1
+pyinstaller==6.22.3
+Pillow==12.3.0
+ruff==0.16.8

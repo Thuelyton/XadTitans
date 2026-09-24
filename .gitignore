@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Ambiente virtual
+.venv/
+venv/
+
+# Build / PyInstaller
+build/
+dist/
+*.spec
+
+# Testes / ferramentas
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Sistema
+Thumbs.db
+.DS_Store
