@@ -37,3 +37,27 @@
   headless (meta: 30).
 - Corrigido: `utils/resources.py` resolvia a raiz errada em desenvolvimento.
 - 613 testes passando (173 novos da Fase 3); Ruff limpo.
+
+## [0.4.0] - 2026-09-24
+
+### Fase 4 - Inteligência artificial
+- `ai/evaluation.py`: avaliação posicional com tabelas piece-square
+  (meio-jogo + final), tapered eval, mobilidade, par de bispos,
+  estrutura de peões (dobrados, isolados, passados), segurança do rei.
+- `ai/search.py`: negamax com poda alfa-beta, quiescence search,
+  iterative deepening, tabela de transposição (python-chess
+  `_transposition_key`), ordenação MVV-LVA + killers + history,
+  mate distance pruning, extensão de xeque.
+- `ai/worker.py`: `AIWorker` em thread daemon com `request()`,
+  `poll()`, `cancel()`, `wait()`, `busy`. 4 níveis de dificuldade
+  (Inicinante d2/0.5s, Fácil d3/2s, Médio d4/5s, Difícil d6/15s).
+  Aleatoriedade controlada com seed para níveis baixos.
+- Integração com `GameScene`: IA joga automaticamente no turno
+  designado, indicador "Pensando...", undo desfaz par de lances
+  (humano+IA), flip e resign funcionam com IA ativa.
+- `tools/bench_ai.py`: benchmark headless (~1000-3000 NPS, eval 670μs).
+- 17 categorias de testes da IA (avaliação, TT, mate, legalidade,
+  promoção, roque, en passant, empate, cancelamento, determinismo,
+  10 partidas AI vs AI headless).
+- 643 testes passando (402 originais + 173 novos das Fases 2-4);
+  Ruff limpo.

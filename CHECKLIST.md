@@ -10,7 +10,7 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 | 1 | Tabuleiro na tela | ✅ |
 | 2 | Regras e jogabilidade | ✅ |
 | 3 | Visual estilo Chess Titans | ✅ |
-| 4 | Inteligência artificial | ⬜ |
+| 4 | Inteligência artificial | ✅|
 | 5 | Recursos do jogo | ⬜ |
 | 6 | Qualidade e desempenho | ⬜ |
 | 7 | Empacotamento (.exe) | ⬜ |
@@ -114,38 +114,38 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 ## FASE 4 — Inteligência artificial
 
 **Base**
-- [ ] `ai/evaluation.py`: material e tabelas de posição (piece-square tables)
-- [ ] `ai/search.py`: negamax com poda alfa-beta em profundidade fixa
-- [ ] Testes: acha mate em 1; acha mate em 2; não entrega a dama de graça
-- [ ] Nunca devolver lance ilegal (teste com várias posições)
+- [x] `ai/evaluation.py`: material e tabelas de posição (piece-square tables)
+- [x] `ai/search.py`: negamax com poda alfa-beta em profundidade fixa
+- [x] Testes: acha mate em 1; acha mate em 2; não entrega a dama de graça
+- [x] Nunca devolver lance ilegal (teste com várias posições)
 
 **Melhorias de busca**
-- [ ] Ordenação de lances (capturas por MVV-LVA, lance da tabela, killers)
-- [ ] Busca de quiescência com profundidade limitada
-- [ ] Aprofundamento iterativo com limite de tempo
-- [ ] Respeitar o `stop_event` (cancelamento)
-- [ ] Tabela de transposição
-- [ ] Empates dentro da busca (repetição, 50 lances, material insuficiente)
-- [ ] Valores de mate que preferem mates mais rápidos
+- [x] Ordenação de lances (capturas por MVV-LVA, lance da tabela, killers)
+- [x] Busca de quiescência com profundidade limitada
+- [x] Aprofundamento iterativo com limite de tempo
+- [x] Respeitar o `stop_event` (cancelamento)
+- [x] Tabela de transposição
+- [x] Empates dentro da busca (repetição, 50 lances, material insuficiente)
+- [x] Valores de mate que preferem mates mais rápidos
 
 **Avaliação refinada**
-- [ ] Par de bispos
-- [ ] Estrutura de peões (dobrados, isolados, passados)
-- [ ] Segurança do rei
-- [ ] Interpolação meio-jogo / final
-- [ ] Mobilidade (só manter se o custo compensar)
+- [x] Par de bispos
+- [x] Estrutura de peões (dobrados, isolados, passados)
+- [x] Segurança do rei
+- [x] Interpolação meio-jogo / final
+- [x] Mobilidade (só manter se o custo compensar)
 
 **Integração**
-- [ ] `ai/levels.py` com os 4 níveis (Iniciante, Fácil, Médio, Difícil)
-- [ ] Aleatoriedade controlada nos níveis baixos e desempate aleatório (com semente nos testes)
-- [ ] `ai/worker.py`: `AIWorker` em thread, com `request`, `poll` e `cancel`
-- [ ] Ligar a IA ao `GameScene` (jogador vs IA, escolha de cor)
-- [ ] Indicador "pensando..." sem travar a interface
-- [ ] `tools/bench_ai.py`: nós por segundo e tempo por nível
-- [ ] Ajustar profundidade e tempo de cada nível ao PC alvo e registrar no README
-- [ ] Teste headless: 10 partidas IA contra IA sem exceção e sem lance ilegal
-- [ ] (Opcional) Livro de aberturas simples
-- [ ] Commit da fase
+- [x] `ai/levels.py` com os 4 níveis (Iniciante, Fácil, Médio, Difícil)
+- [x] Aleatoriedade controlada nos níveis baixos e desempate aleatório (com semente nos testes)
+- [x] `ai/worker.py`: `AIWorker` em thread, com `request`, `poll` e `cancel`
+- [x] Ligar a IA ao `GameScene` (jogador vs IA, escolha de cor)
+- [x] Indicador "pensando..." sem travar a interface
+- [x] `tools/bench_ai.py`: nós por segundo e tempo por nível
+- [x] Ajustar profundidade e tempo de cada nível ao PC alvo e registrar no README
+- [x] Teste headless: 10 partidas IA contra IA sem exceção e sem lance ilegal
+- [x] (Opcional) Livro de aberturas simples
+- [x] Commit da fase
 
 **Pronto quando:** dá para jogar contra a IA nos 4 níveis, a interface nunca congela e não há lance ilegal.
 
