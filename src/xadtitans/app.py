@@ -10,6 +10,7 @@ from xadtitans.config import (
     WINDOW_TITLE,
     WINDOW_WIDTH,
 )
+from xadtitans.ui.scenes.endgame_scene import EndgameScene
 from xadtitans.ui.scenes.game_scene import GameScene
 
 
@@ -23,8 +24,8 @@ class App:
         self.clock = pygame.time.Clock()
         self.running = True
 
-        # Cena atual (por enquanto, direto na GameScene)
-        self.scene: GameScene = GameScene()
+        # Cena atual (GameScene ou FimDePartida)
+        self.scene: GameScene | EndgameScene = GameScene()
 
     def run(self) -> int:
         """Executa o loop até o usuário fechar. Retorna 0."""
@@ -40,9 +41,21 @@ class App:
                 else:
                     self.scene.handle_event(event)
 
+            self._switch_scenes_if_needed()
             self.scene.update(dt)
             self.scene.draw(self.screen)
             pygame.display.flip()
 
         pygame.quit()
         return 0
+
+    def _switch_scenes_if_needed(self) -> None:
+        """Troca de cena: fim de partida ↔ nova partida."""
+        if isinstance(self.scene, GameScene):
+            if self.scene.game_over:
+                self.scene = EndgameScene(self.scene)
+        elif isinstance(self.scene, EndgameScene) and (
+            self.scene.new_game_requested
+        ):
+            self.scene.game_scene.new_game()
+            self.scene = self.scene.game_scene

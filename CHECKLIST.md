@@ -8,7 +8,7 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 |---|---|---|
 | 0 | Preparação | ✅ |
 | 1 | Tabuleiro na tela | ✅ |
-| 2 | Regras e jogabilidade | ⬜ |
+| 2 | Regras e jogabilidade | ✅ |
 | 3 | Visual estilo Chess Titans | ⬜ |
 | 4 | Inteligência artificial | ⬜ |
 | 5 | Recursos do jogo | ⬜ |
@@ -59,26 +59,26 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 
 ## FASE 2 — Regras e jogabilidade (2 jogadores)
 
-- [ ] `core/types.py` com `Level`, `Status` e `GameResult`
-- [ ] `core/game.py` (`Game`) usando `python-chess`
-- [ ] Clicar em uma peça mostra os movimentos legais
-- [ ] Mover por clique (peças só se movem em lances legais)
-- [ ] Diálogo de promoção do peão (dama, torre, bispo, cavalo)
-- [ ] Roque (curto e longo) funcionando, inclusive regra de casas atacadas
-- [ ] En passant funcionando
-- [ ] Detecção de xeque e destaque do rei
-- [ ] Fim de partida: xeque-mate
-- [ ] Fim de partida: afogamento
-- [ ] Fim de partida: material insuficiente
-- [ ] Fim de partida: regra dos 50 lances
-- [ ] Fim de partida: tripla repetição
-- [ ] Desistir
-- [ ] Desfazer jogada (`undo`)
-- [ ] Lista de jogadas em notação algébrica (SAN)
-- [ ] Peças capturadas por cor
-- [ ] Cena `FimDePartida` com o resultado
-- [ ] Testes de regras: mate do louco, mate do pastor, afogamento, material insuficiente, roque ilegal, en passant, promoção, desfazer
-- [ ] Commit da fase
+- [x] `core/types.py` com `Level`, `Status` e `GameResult`
+- [x] `core/game.py` (`Game`) usando `python-chess`
+- [x] Clicar em uma peça mostra os movimentos legais
+- [x] Mover por clique (peças só se movem em lances legais)
+- [x] Diálogo de promoção do peão (dama, torre, bispo, cavalo)
+- [x] Roque (curto e longo) funcionando, inclusive regra de casas atacadas
+- [x] En passant funcionando
+- [x] Detecção de xeque e destaque do rei
+- [x] Fim de partida: xeque-mate
+- [x] Fim de partida: afogamento
+- [x] Fim de partida: material insuficiente
+- [x] Fim de partida: regra dos 50 lances
+- [x] Fim de partida: tripla repetição
+- [x] Desistir
+- [x] Desfazer jogada (`undo`)
+- [x] Lista de jogadas em notação algébrica (SAN)
+- [x] Peças capturadas por cor
+- [x] Cena `FimDePartida` com o resultado
+- [x] Testes de regras: mate do louco, mate do pastor, afogamento, material insuficiente, roque ilegal, en passant, promoção, desfazer
+- [x] Commit da fase
 
 **Pronto quando:** dá para jogar uma partida completa entre duas pessoas, com todas as regras corretas e testes passando.
 

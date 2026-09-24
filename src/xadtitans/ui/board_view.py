@@ -19,6 +19,7 @@ from xadtitans.config import (
     BOARD_SIZE,
     BOARD_X,
     BOARD_Y,
+    COLOR_CHECK_GLOW,
     COLOR_COORD,
     COLOR_DARK_SQ,
     COLOR_LAST_MOVE_DARK,
@@ -139,6 +140,9 @@ class BoardView:
 
         # Último lance (para destaque visual)
         self.last_move: chess.Move | None = None
+
+        # Rei em xeque (para destaque visual, Fase 2)
+        self.check_square: int | None = None
 
         # Fonte para coordenadas
         self._coord_font = pygame.font.SysFont("arial", 18, bold=True)
@@ -268,6 +272,16 @@ class BoardView:
                 SQUARE_SIZE,
             )
             pygame.draw.rect(surface, color, rect)
+
+        # Brilho vermelho no rei em xeque (retângulo semitransparente)
+        if self.check_square is not None:
+            sq = self.check_square
+            x, y = square_to_pixel(
+                sq, BOARD_X, BOARD_Y, SQUARE_SIZE, self.flipped
+            )
+            glow = pygame.Surface((SQUARE_SIZE, SQUARE_SIZE), pygame.SRCALPHA)
+            glow.fill(COLOR_CHECK_GLOW)
+            surface.blit(glow, (x - SQUARE_SIZE // 2, y - SQUARE_SIZE // 2))
 
         # Pontos nos destinos legais
         for dest in self.legal_destinations:
