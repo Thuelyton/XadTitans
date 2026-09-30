@@ -32,19 +32,55 @@ TEXTS: dict[str, str] = {
     "status.time_out": "Tempo esgotado",
     # Textos principais de menus e navegação
     "menu.title": "XadTitans",
+    "menu.subtitle": "Xadrez com Inteligência Artificial e Estilo Titan",
     "menu.new_game": "Novo Jogo",
     "menu.continue": "Continuar",
     "menu.load": "Carregar Partida",
     "menu.settings": "Configurações",
     "menu.stats": "Estatísticas",
     "menu.quit": "Sair",
+    # Genéricos e Ações
+    "common.back": "Voltar",
+    "common.save": "Salvar",
+    "common.reset": "Restaurar Padrões",
+    "common.ok": "OK",
+    # Tela de Nova Partida
+    "new_game.title": "Nova Partida",
+    "new_game.mode": "Modo de Jogo",
+    "new_game.side": "Sua Cor",
+    "new_game.level": "Dificuldade da IA",
+    "new_game.clock": "Relógio",
+    "new_game.clock_none": "Sem relógio",
+    "new_game.start": "Iniciar Partida",
+    # Tela de Configurações
+    "settings.title": "Configurações",
+    "settings.volume": "Volume do Som",
+    "settings.anim_speed": "Velocidade das Animações",
+    "settings.fps": "Taxa de Quadros (FPS)",
+    "settings.resolution": "Resolução",
+    "settings.visual_hints": "Ajudas Visuais",
+    "settings.enabled": "Ativado",
+    "settings.disabled": "Desativado",
+    # Tela de Estatísticas
+    "stats.title": "Estatísticas",
+    "stats.total": "Total de Partidas",
+    "stats.by_mode": "Por Modo de Jogo",
+    "stats.by_level": "Por Nível de IA",
+    "stats.wins": "Vitórias",
+    "stats.losses": "Derrotas",
+    "stats.draws": "Empates",
+    # Tela / Mensagem de Carregar e Continuar
+    "load.title": "Carregar Partida",
+    "load.no_autosave": "Nenhuma partida salva para continuar.",
+    "load.no_pgns": "Nenhum arquivo PGN encontrado.",
+    "load.select_pgn": "Selecione um arquivo PGN:",
     # Dicas e atalhos da partida
     "game.thinking": "Pensando...",
     "game.game_over": "Fim de partida",
     "game.wins": "vencem",
     "game.resigned_wins": "vencem por desistência",
     "game.draw": "Empate",
-    "hint.endgame": "Enter: nova partida    Esc: sair",
+    "hint.endgame": "Enter: nova partida    Esc: voltar ao menu",
 }
 
 
