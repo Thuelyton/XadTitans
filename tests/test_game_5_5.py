@@ -648,8 +648,11 @@ class TestKeyboardShortcuts:
         sm.push(gs)
         assert sm.count == 2
         _press(gs, pygame.K_n)
-        assert sm.count == 3
+        # N substitui a GameScene: a pilha fica [Menu, NewGame]
+        # (o atalho nunca acumula GameScenes — Etapa 6.3).
+        assert sm.count == 2
         assert isinstance(sm.current, NewGameScene)
+        assert gs not in sm.scenes
         sm.clear()
 
     def test_key_n_when_draw_pending_declines(self) -> None:

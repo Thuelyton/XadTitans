@@ -185,6 +185,9 @@ class NewGameScene:
                 ai_level=level,
                 clock_minutes=clock_min,
                 clock_increment=increment_sec,
+                # Encaminha o SceneManager: o atalho N (nova partida)
+                # depende dele para substituir esta cena na pilha.
+                scene_manager=self.scene_manager,
             )
             # Nova partida: invalida o autosave anterior logo de início
             # (o Continuar nunca reabre a partida antiga).

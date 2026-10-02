@@ -459,10 +459,16 @@ class GameScene:
     # ── nova partida ─────────────────────────────────────
 
     def _new_game_shortcut(self) -> None:
-        """Abre NewGameScene via SceneManager se disponível."""
+        """Abre NewGameScene substituindo a partida atual (``switch``).
+
+        A GameScene atual sai da pilha e recebe ``on_exit`` (cancela
+        IA/dicas e grava o autosave da partida abandonada). Assim o
+        atalho N nunca acumula GameScenes: a pilha permanece
+        ``[Menu, NewGame]`` até a nova partida começar.
+        """
         if self.scene_manager is not None:
             from xadtitans.ui.scenes.new_game_scene import NewGameScene
-            self.scene_manager.push(NewGameScene(self.scene_manager, self.audio))
+            self.scene_manager.switch(NewGameScene(self.scene_manager, self.audio))
 
     # ── hint (tecla H) ───────────────────────────────────
 
