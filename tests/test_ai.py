@@ -355,3 +355,51 @@ class TestAIVsAI:
         total = results["white"] + results["black"] + results["draw"]
         assert total == 10
         print(f"\nResultados AI vs AI: {results}")
+
+
+# ════════════════════════════════════════════════════════════
+# Testes adicionais de borda para AI Search e Worker
+# ════════════════════════════════════════════════════════════
+
+class TestAISearchAndWorkerEdgeCases:
+    def test_tt_overflow_limpa_tabela(self) -> None:
+        tt = TranspositionTable(max_size=2)
+        b1 = chess.Board("8/8/8/8/8/8/8/K6k w - - 0 1")
+        b2 = chess.Board("8/8/8/8/8/8/8/K6r w - - 0 1")
+        b3 = chess.Board("8/8/8/8/8/8/8/K6q w - - 0 1")
+        tt.store(b1, 1, 0, EXACT, None)
+        tt.store(b2, 1, 0, EXACT, None)
+        assert len(tt) == 2
+        tt.store(b3, 1, 0, EXACT, None)  # deve limpar a tabela antes de inserir
+        assert len(tt) == 1
+
+    def test_iterative_deepening_unico_lance(self) -> None:
+        # Posição onde só há 1 lance legal
+        board = chess.Board("8/8/8/8/8/8/7r/K6k w - - 0 1")
+        move, _score, depth, _nps = iterative_deepening(board, max_depth=5)
+        assert move == chess.Move.from_uci("a1b1")
+        assert depth == 1
+
+    def test_worker_duplo_request_poll_e_wait_timeout(self) -> None:
+        board = chess.Board()
+        worker = AIWorker(board, level=Level.INICIANTE)
+        assert worker.poll() is None
+        assert worker.wait(timeout=0.001) is None
+        worker.request()
+        worker.request()  # segundo request com thread viva não faz nada
+        move = worker.wait(timeout=5.0)
+        assert move in board.legal_moves
+
+    def test_worker_run_exception_fallback(self) -> None:
+        board = chess.Board()
+        worker = AIWorker(board, level=Level.INICIANTE)
+
+        def mock_id(*args, **kwargs):
+            raise RuntimeError("Erro simulado na busca")
+
+        from unittest.mock import patch
+        with patch("xadtitans.ai.worker.iterative_deepening", side_effect=mock_id):
+            worker.request()
+            move = worker.wait(timeout=5.0)
+            assert move in board.legal_moves
+

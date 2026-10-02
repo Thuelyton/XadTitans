@@ -416,3 +416,112 @@ class TestTipos:
         assert list(game.san_history) == []
         assert game.captured_by(chess.WHITE) == []
         assert game.result() is None
+
+    def test_enums_cobertura(self) -> None:
+        from xadtitans.core.types import GameMode
+        assert len(GameMode) == 3
+        assert GameMode.HUMAN_VS_HUMAN in list(GameMode)
+        assert GameMode.HUMAN_VS_AI in list(GameMode)
+        assert GameMode.AI_VS_AI in list(GameMode)
+        assert Level.INICIANTE in list(Level)
+        assert Level.FACIL in list(Level)
+        assert Level.MEDIO in list(Level)
+        assert Level.DIFICIL in list(Level)
+
+    def test_game_result_is_draw_propriedade(self) -> None:
+        r_win = GameResult(status=Status.XEQUE_MATE, winner=chess.BLACK)
+        assert not r_win.is_draw
+        r_draw = GameResult(status=Status.TEMPO_ESGOTADO, winner=None)
+        assert r_draw.is_draw
+
+
+# ════════════════════════════════════════════════════════════
+# Relógio e resultados especiais do Game
+# ════════════════════════════════════════════════════════════
+
+class TestClockCore:
+    def test_clock_black_turn_tick_e_increment(self) -> None:
+        from xadtitans.core.clock import ChessClock
+        clock = ChessClock(minutes=5, increment=2)
+        clock.tick(10.0, chess.BLACK)
+        assert clock.get_time(chess.BLACK) == 290.0
+        clock.apply_increment(chess.BLACK)
+        assert clock.get_time(chess.BLACK) == 292.0
+        clock.set_time(chess.BLACK, 0.0)
+        assert clock.is_timeout(chess.BLACK)
+        assert not clock.is_timeout(chess.WHITE)
+
+    def test_clock_inativo_ou_pausado(self) -> None:
+        from xadtitans.core.clock import ChessClock
+        clock = ChessClock(minutes=0, increment=0)
+        assert not clock.is_active
+        clock.tick(5.0, chess.WHITE)
+        clock.apply_increment(chess.WHITE)
+        assert not clock.is_timeout(chess.WHITE)
+
+        clock_active = ChessClock(minutes=5, increment=2)
+        clock_active.apply_increment(chess.WHITE)
+        assert clock_active.get_time(chess.WHITE) == 302.0
+        clock_active.set_time(chess.WHITE, 100.0)
+        assert clock_active.get_time(chess.WHITE) == 100.0
+
+        clock_active.pause()
+        clock_active.tick(10.0, chess.WHITE)
+        assert clock_active.get_time(chess.WHITE) == 100.0
+        clock_active.resume()
+        clock_active.tick(10.0, chess.WHITE)
+        assert clock_active.get_time(chess.WHITE) == 90.0
+        clock_active.reset()
+        assert clock_active.get_time(chess.WHITE) == 300.0
+
+
+class TestGameResultadosEspeciais:
+    def test_timeout_brancas_e_pretas(self) -> None:
+        game = Game()
+        game.timeout(chess.WHITE)
+        assert game.is_game_over()
+        res = game.result()
+        assert res is not None
+        assert res.status is Status.TEMPO_ESGOTADO
+        assert res.winner is chess.BLACK
+
+        game_b = Game()
+        game_b.timeout(chess.BLACK)
+        assert game_b.is_game_over()
+        res_b = game_b.result()
+        assert res_b is not None
+        assert res_b.status is Status.TEMPO_ESGOTADO
+        assert res_b.winner is chess.WHITE
+
+    def test_agree_draw(self) -> None:
+        game = Game()
+        game.agree_draw()
+        assert game.is_game_over()
+        res = game.result()
+        assert res is not None
+        assert res.status is Status.EMPATE_ACORDO
+        assert res.winner is None
+        assert res.is_draw
+
+    def test_undo_limpa_timeout_e_empate_acordo(self) -> None:
+        game = Game()
+        _uci(game, "e2e4")
+        game.timeout(chess.BLACK)
+        assert game.is_game_over()
+        game.undo()
+        assert not game.is_game_over()
+
+        _uci(game, "e2e4")
+        game.agree_draw()
+        assert game.is_game_over()
+        game.undo()
+        assert not game.is_game_over()
+
+    def test_undo_black_capture(self) -> None:
+        game = Game()
+        for uci in ("e2e4", "d7d5", "a2a3", "d5e4"):
+            game.push(chess.Move.from_uci(uci))
+        assert game.captured_by(chess.BLACK) == [chess.PAWN]
+        game.undo()
+        assert game.captured_by(chess.BLACK) == []
+
