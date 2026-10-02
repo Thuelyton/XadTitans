@@ -26,6 +26,7 @@ class AudioManager:
     """Toca os efeitos sonoros do jogo."""
 
     def __init__(self) -> None:
+        """Carrega os efeitos sonoros; fica desativado se o mixer falhar."""
         self.enabled = False
         self._sounds: dict[str, pygame.mixer.Sound] = {}
         self._master = 1.0

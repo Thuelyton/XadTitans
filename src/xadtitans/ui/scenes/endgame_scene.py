@@ -40,6 +40,7 @@ class EndgameScene:
         game_scene: GameScene,
         scene_manager: SceneManager | None = None,
     ) -> None:
+        """Cria o overlay com o resultado da ``game_scene`` no momento atual."""
         self.game_scene = game_scene
         self.scene_manager = scene_manager
         self.new_game_requested = False
@@ -52,6 +53,7 @@ class EndgameScene:
     # ── interface de cena ─────────────────────────────────
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        """Enter/N inicia nova partida; Esc volta ao menu principal."""
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_n):
                 self.new_game_requested = True
@@ -67,9 +69,10 @@ class EndgameScene:
                         self.scene_manager.pop()
 
     def update(self, dt: float) -> None:
-        pass
+        """Overlay estática; não há lógica a atualizar (``dt`` é ignorado)."""
 
     def draw(self, surface: pygame.Surface) -> None:
+        """Desenha tabuleiro congelado, véu escurecido e o texto do resultado."""
         # Tabuleiro congelado ao fundo
         surface.fill(COLOR_BG)
         self.game_scene.board_view.draw(surface)

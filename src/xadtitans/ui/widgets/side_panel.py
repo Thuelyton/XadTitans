@@ -43,6 +43,7 @@ class SidePanel:
     """Painel à direita do tabuleiro (jogadas + capturadas)."""
 
     def __init__(self, board_view: BoardView, rect: pygame.Rect) -> None:
+        """Cria o painel ancorado em ``rect`` usando os sprites de ``board_view``."""
         self._bv = board_view
         self.rect = rect
         self._scroll = 0
@@ -66,6 +67,7 @@ class SidePanel:
     def draw(
         self, surface: pygame.Surface, game: Game, clock: ChessClock | None = None
     ) -> None:
+        """Desenha título, status/relógio, peças capturadas e jogadas (com rolagem)."""
         pygame.draw.rect(surface, _BG, self.rect)
         pygame.draw.rect(surface, _BORDER, self.rect, 1)
 

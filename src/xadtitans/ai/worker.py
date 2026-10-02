@@ -49,6 +49,13 @@ class AIWorker:
         level: Level = Level.MEDIO,
         seed: int | None = None,
     ) -> None:
+        """Prepara o worker: copia o tabuleiro e aplica os limites do nível.
+
+        Args:
+            board: posição a buscar (copiada; o original não é alterado).
+            level: nível de dificuldade (define profundidade e aleatoriedade).
+            seed: semente opcional para reprodutibilidade da aleatoriedade.
+        """
         self._board = board.copy()
         self._level = level
         self._max_depth = _MAX_DEPTH[level]
@@ -91,6 +98,7 @@ class AIWorker:
 
     @property
     def busy(self) -> bool:
+        """True enquanto a thread de busca estiver em execução."""
         return self._thread is not None and self._thread.is_alive()
 
     def _run(self) -> None:

@@ -33,6 +33,7 @@ class StatsScene:
         audio: AudioManager | None = None,
         stats: Stats | None = None,
     ) -> None:
+        """Carrega as estatísticas persistidas e monta o botão Voltar."""
         self.scene_manager = scene_manager
         self.audio = audio or AudioManager()
         self.stats = stats or Stats()
@@ -58,6 +59,7 @@ class StatsScene:
     # ── interface de cena ─────────────────────────────────
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        """Esc ou Voltar retornam à tela anterior."""
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self._go_back()
             return
@@ -66,10 +68,12 @@ class StatsScene:
             return
 
     def update(self, dt: float) -> None:
+        """Atualiza o hover do botão Voltar (``dt`` é ignorado)."""
         pos = pygame.mouse.get_pos()
         self.btn_back.update_hover(pos)
 
     def draw(self, surface: pygame.Surface) -> None:
+        """Desenha totais, estatísticas por modo/nível e o botão Voltar."""
         surface.fill(COLOR_BG)
 
         # Título

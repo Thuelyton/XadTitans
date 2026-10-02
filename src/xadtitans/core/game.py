@@ -37,6 +37,7 @@ class Game:
     """Partida de xadrez para 2 jogadores, com regras via python-chess."""
 
     def __init__(self, fen: str | None = None) -> None:
+        """Cria a partida; ``fen`` inicia de posição customizada (padrão: inicial)."""
         self.board = chess.Board(fen) if fen is not None else chess.Board()
         self._san_history: list[str] = []
         # Peças capturadas por cada cor (na ordem das capturas).

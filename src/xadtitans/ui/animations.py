@@ -86,6 +86,7 @@ class Anim:
 
     @property
     def done(self) -> bool:
+        """True quando a animação atingiu 100% do progresso."""
         return self.progress >= 1.0
 
     @property
@@ -117,9 +118,11 @@ class Animator:
     """Conjunto de animações ativas + trava de entrada."""
 
     def __init__(self) -> None:
+        """Cria o gerenciador sem animações ativas."""
         self._anims: list[Anim] = []
 
     def add(self, anim: Anim) -> None:
+        """Adiciona uma animação à fila de ativas."""
         self._anims.append(anim)
 
     def update(self, dt: float) -> None:
@@ -139,6 +142,7 @@ class Animator:
         return any(a.kind == SLIDE for a in self._anims)
 
     def clear(self) -> None:
+        """Descarta imediatamente todas as animações ativas."""
         self._anims.clear()
 
     def by_square(self) -> dict[int, list[Anim]]:

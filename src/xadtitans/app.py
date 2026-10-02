@@ -28,6 +28,7 @@ class App:
     """Janela principal — roda o loop de eventos e renderização."""
 
     def __init__(self) -> None:
+        """Inicializa pygame, janela, configurações, áudio e a pilha de cenas."""
         pygame.init()
 
         self.settings = Settings()

@@ -29,6 +29,7 @@ class LoadScene:
         scene_manager: SceneManager | None = None,
         audio: AudioManager | None = None,
     ) -> None:
+        """Monta a lista de PGNs disponíveis e o botão Voltar."""
         self.scene_manager = scene_manager
         self.audio = audio or AudioManager()
 
@@ -94,9 +95,11 @@ class LoadScene:
     # ── ciclo de vida ─────────────────────────────────────
 
     def on_enter(self) -> None:
+        """Recarrega a lista de PGNs ao entrar na cena (pode ter mudado)."""
         self._build_file_list()
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        """Esc volta; demais eventos são repassados aos botões da lista."""
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self._go_back()
             return
@@ -109,12 +112,14 @@ class LoadScene:
             return
 
     def update(self, dt: float) -> None:
+        """Atualiza o hover dos botões (``dt`` é ignorado)."""
         pos = pygame.mouse.get_pos()
         for _, btn in self.file_buttons:
             btn.update_hover(pos)
         self.btn_back.update_hover(pos)
 
     def draw(self, surface: pygame.Surface) -> None:
+        """Desenha título, lista de PGNs (ou aviso) e botão Voltar."""
         surface.fill(COLOR_BG)
 
         # Título

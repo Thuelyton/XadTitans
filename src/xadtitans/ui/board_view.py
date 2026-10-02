@@ -130,6 +130,7 @@ class BoardView:
     """Desenha o tabuleiro em perspectiva, peças e destaques."""
 
     def __init__(self) -> None:
+        """Carrega o mapa de casas e as imagens do tabuleiro e das peças."""
         self.flipped = False
 
         base_map = BoardMap.load(resource_path("assets/board/squares.json"))

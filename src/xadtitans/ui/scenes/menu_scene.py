@@ -35,6 +35,7 @@ class MenuScene:
         scene_manager: SceneManager | None = None,
         audio: AudioManager | None = None,
     ) -> None:
+        """Monta os botões do menu e o gerenciador de som."""
         self.scene_manager = scene_manager
         self.audio = audio or AudioManager()
         self.quit_requested = False
@@ -142,6 +143,7 @@ class MenuScene:
         self._build_buttons()
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        """Esc encerra o jogo; demais eventos são repassados aos botões."""
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.quit_requested = True
             return
@@ -151,6 +153,7 @@ class MenuScene:
                 break
 
     def update(self, dt: float) -> None:
+        """Decrementa o temporizador da mensagem e atualiza os hovers."""
         if self.message_timer > 0:
             self.message_timer -= dt
             if self.message_timer <= 0:
@@ -161,6 +164,7 @@ class MenuScene:
             btn.update_hover(mouse_pos)
 
     def draw(self, surface: pygame.Surface) -> None:
+        """Desenha título, subtítulo, botões e mensagem temporária (se houver)."""
         surface.fill(COLOR_BG)
 
         # Título principal

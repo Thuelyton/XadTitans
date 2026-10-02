@@ -34,6 +34,7 @@ class NewGameScene:
         scene_manager: SceneManager | None = None,
         audio: AudioManager | None = None,
     ) -> None:
+        """Cria seletores de modo/lado/nível/relógio e botões Iniciar/Voltar."""
         self.scene_manager = scene_manager
         self.audio = audio or AudioManager()
 
@@ -199,6 +200,7 @@ class NewGameScene:
     # ── interface de cena ─────────────────────────────────
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        """Esc volta, Enter inicia; demais eventos vão aos seletores e botões."""
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self._go_back()
@@ -224,6 +226,7 @@ class NewGameScene:
             return
 
     def update(self, dt: float) -> None:
+        """Atualiza o hover de todos os controles (``dt`` é ignorado)."""
         pos = pygame.mouse.get_pos()
         self.sel_mode.update_hover(pos)
         self.sel_side.update_hover(pos)
@@ -234,6 +237,7 @@ class NewGameScene:
         self.btn_back.update_hover(pos)
 
     def draw(self, surface: pygame.Surface) -> None:
+        """Desenha título, rótulos, seletores e botões Iniciar/Voltar."""
         surface.fill(COLOR_BG)
 
         # Título

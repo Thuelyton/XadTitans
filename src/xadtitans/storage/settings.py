@@ -116,6 +116,7 @@ class Settings:
     """
 
     def __init__(self, path: Path | None = None) -> None:
+        """Prepara o gerenciador; ``path`` padrão é ``settings_path()``."""
         self._path = path or settings_path()
         self._data: dict[str, Any] = dict(DEFAULTS)
         self._loaded = False

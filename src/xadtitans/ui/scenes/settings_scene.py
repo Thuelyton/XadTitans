@@ -36,6 +36,7 @@ class SettingsScene:
         audio: AudioManager | None = None,
         settings: Settings | None = None,
     ) -> None:
+        """Carrega as configurações e monta seletores e botões de ação."""
         self.scene_manager = scene_manager
         self.audio = audio or AudioManager()
         self.settings = settings or Settings()
@@ -172,6 +173,7 @@ class SettingsScene:
     # ── interface de cena ─────────────────────────────────
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        """Esc volta; demais eventos vão aos seletores e botões."""
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self._go_back()
             return
@@ -195,6 +197,7 @@ class SettingsScene:
             return
 
     def update(self, dt: float) -> None:
+        """Decrementa o temporizador da mensagem e atualiza os hovers."""
         if self.message_timer > 0:
             self.message_timer -= dt
             if self.message_timer <= 0:
@@ -211,6 +214,7 @@ class SettingsScene:
         self.btn_back.update_hover(pos)
 
     def draw(self, surface: pygame.Surface) -> None:
+        """Desenha título, linhas de configuração, botões e mensagem (se houver)."""
         surface.fill(COLOR_BG)
 
         # Título

@@ -38,6 +38,7 @@ class BoardMap:
         width: int,
         height: int,
     ) -> None:
+        """Mantém o mapa ``casa → SquareGeom`` e o tamanho da imagem."""
         self._squares = squares
         self.width = width
         self.height = height

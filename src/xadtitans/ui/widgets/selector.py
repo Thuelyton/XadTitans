@@ -24,6 +24,7 @@ class Selector:
         enabled: bool = True,
         font: pygame.font.Font | None = None,
     ) -> None:
+        """Cria o seletor; ``options`` são pares (valor, rótulo) exibidos."""
         self.rect = pygame.Rect(rect)
         self.options = options
         self._index = min(max(0, current_index), max(0, len(options) - 1))

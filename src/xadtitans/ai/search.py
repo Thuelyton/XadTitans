@@ -25,10 +25,12 @@ MATE_SCORE = 20000
 
 
 def mate_in(ply: int) -> int:
+    """Pontuação que indica xeque-mate em ``ply`` lances (20000 - ply)."""
     return MATE_SCORE - ply
 
 
 def is_mate(score: int) -> bool:
+    """True se a pontuação indica mate (|score| >= MATE_SCORE - 1000)."""
     return abs(score) >= MATE_SCORE - 1000
 
 
@@ -45,6 +47,7 @@ class TranspositionTable:
     """Tabela de transposição baseada em ``_transposition_key``."""
 
     def __init__(self, max_size: int = 1 << 20) -> None:
+        """Cria a tabela com capacidade máxima de ``max_size`` entradas."""
         self._table: dict = {}
         self._max_size = max_size
 
@@ -56,6 +59,7 @@ class TranspositionTable:
         flag: int,
         best_move: chess.Move | None,
     ) -> None:
+        """Armazena uma entrada para a posição; limpa a tabela se cheia."""
         if len(self._table) >= self._max_size:
             self._table.clear()
         self._table[board._transposition_key()] = (
@@ -65,12 +69,15 @@ class TranspositionTable:
     def probe(
         self, board: chess.Board
     ) -> tuple[int, int, int, chess.Move | None] | None:
+        """Retorna (profundidade, pontuação, bandeira, melhor_lance) ou None."""
         return self._table.get(board._transposition_key())
 
     def clear(self) -> None:
+        """Remove todas as entradas da tabela."""
         self._table.clear()
 
     def __len__(self) -> int:
+        """Número de entradas armazenadas."""
         return len(self._table)
 
 
@@ -300,6 +307,12 @@ def iterative_deepening(
     stop_event: threading.Event | None = None,
 ) -> tuple[chess.Move | None, int, int, float]:
     """Busca iterativa por profundidade.
+
+    Args:
+        board: posição atual a analisar.
+        max_depth: profundidade máxima de busca.
+        tt: tabela de transposição a reutilizar (criada se None).
+        stop_event: sinaliza interrupção prematura da busca.
 
     Returns:
         (melhor_lance, pontuação, profundidade_alcançada, nós_por_segundo)

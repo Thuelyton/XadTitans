@@ -1,0 +1,1 @@
+"""Utilitários comuns (logging, recursos)."""

@@ -79,6 +79,18 @@ class GameScene:
         clock_increment: int = 0,
         scene_manager: object | None = None,
     ) -> None:
+        """Monta a cena de partida para o modo, lado da IA e relógio indicados.
+
+        Args:
+            audio: gerenciador de som (criado um se None).
+            game_mode: HUMAN_VS_HUMAN, HUMAN_VS_AI ou AI_VS_AI.
+            ai_color: lado da IA em HUMAN_VS_AI (padrão: pretas).
+            ai_level: nível de dificuldade da IA.
+            ai_vs_ai_delay: intervalo visual entre lances no modo AI_VS_AI.
+            clock_minutes: minutos do relógio (0 = sem relógio).
+            clock_increment: incremento em segundos por lance.
+            scene_manager: gerenciador de cenas (para transições).
+        """
         self.game = Game()
         self.clock = ChessClock(minutes=clock_minutes, increment=clock_increment)
         self.board_view = BoardView()
@@ -154,6 +166,7 @@ class GameScene:
     # ── interface de cena ─────────────────────────────────
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        """Encaminha eventos: painel lateral, clique, hover e teclas de atalho."""
         if self.side_panel.handle_event(event):
             return
 
@@ -187,6 +200,7 @@ class GameScene:
                 self._new_game_shortcut()
 
     def update(self, dt: float) -> None:
+        """Atualiza animações, IA, dica e relógio (``dt`` em segundos)."""
         self.animator.update(dt)
         self._update_ai_vs_ai_timer(dt)
         self._poll_ai()
@@ -197,6 +211,7 @@ class GameScene:
                 self._handle_timeout(self.game.turn)
 
     def draw(self, surface: pygame.Surface) -> None:
+        """Desenha tabuleiro, painel lateral e overlays (promoção, IA, empate)."""
         surface.fill(COLOR_BG)
         self.board_view.draw(surface, anims=self.animator.by_square())
         if self.hint_move is not None:
@@ -218,11 +233,13 @@ class GameScene:
 
     @property
     def game_over(self) -> bool:
+        """True se a partida terminou (vitória, empate, desistência ou tempo)."""
         return self.game.is_game_over()
 
     # ── ciclo de vida ─────────────────────────────────────
 
     def new_game(self) -> None:
+        """Reinicia partida, relógio e estado da cena; dispara IA se necessário."""
         self.game.reset()
         self.clock.reset()
         self._clock_history.clear()
@@ -341,6 +358,7 @@ class GameScene:
     # ── desfazer e desistir ───────────────────────────────
 
     def undo(self) -> None:
+        """Desfaz 1 ou 2 lances conforme o modo, restaurando relógio e visão."""
         # Cancelar IA ativa e limpar timer
         if self._ai_worker is not None and self._ai_worker.busy:
             self._cancel_ai()
@@ -402,6 +420,7 @@ class GameScene:
         self._autosave()
 
     def resign(self) -> None:
+        """O lado da vez desiste e encerra a partida (remove o autosave)."""
         if not self.game.is_game_over():
             self._cancel_ai()
             self._cancel_hint()

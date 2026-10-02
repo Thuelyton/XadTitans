@@ -16,6 +16,7 @@ class SceneManager:
     """Gerenciador de cenas baseado em pilha (stack)."""
 
     def __init__(self) -> None:
+        """Cria o gerenciador com a pilha de cenas vazia."""
         self._stack: list[Any] = []
 
     @property

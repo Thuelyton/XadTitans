@@ -32,6 +32,7 @@ class Button:
         border_color: tuple[int, int, int] = (80, 80, 80),
         hover_border_color: tuple[int, int, int] = (255, 215, 0),
     ) -> None:
+        """Cria o botão; ``rect`` aceita ``pygame.Rect`` ou tupla (x, y, w, h)."""
         self.rect = pygame.Rect(rect)
         self.text = text
         self.callback = callback

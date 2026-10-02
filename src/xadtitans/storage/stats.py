@@ -111,6 +111,7 @@ class Stats:
     """
 
     def __init__(self, path: Path | None = None) -> None:
+        """Prepara o gerenciador; ``path`` padrão é ``stats_path()``."""
         self._path = path or stats_path()
         self._data: dict[str, Any] = _empty_stats()
 
