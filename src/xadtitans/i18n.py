@@ -90,6 +90,11 @@ TEXTS: dict[str, str] = {
     "load.no_autosave": "Nenhuma partida salva para continuar.",
     "load.no_pgns": "Nenhum arquivo PGN encontrado.",
     "load.select_pgn": "Selecione um arquivo PGN:",
+    "load.autosave_corrupted": "Não foi possível recuperar a partida salva.",
+    # Erros (tratamento global de exceções)
+    "error.title": "Erro",
+    "error.fatal": "Ocorreu um erro inesperado e o jogo será fechado. O problema foi registrado no log.",
+    "error.press_key": "Pressione qualquer tecla para sair",
     # Dicas e atalhos da partida
     "game.thinking": "Pensando...",
     "game.game_over": "Fim de partida",

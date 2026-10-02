@@ -21,3 +21,6 @@ htmlcov/
 # Sistema
 Thumbs.db
 .DS_Store
+
+# Dados locais do XadTitans (fallback quando %APPDATA% indisponível)
+.xadtitans_data/

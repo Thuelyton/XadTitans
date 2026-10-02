@@ -35,9 +35,11 @@ from xadtitans.core.clock import ChessClock
 from xadtitans.core.game import Game
 from xadtitans.core.types import GameMode, Level
 from xadtitans.i18n import t
+from xadtitans.storage.autosave import delete_autosave, save_state
 from xadtitans.ui.animations import FADE, SLIDE, Anim, Animator, ease_out_cubic
 from xadtitans.ui.board_view import BoardView
 from xadtitans.ui.widgets.side_panel import SidePanel
+from xadtitans.utils.logger import get_logger
 
 _PROMO_PIECES: list[chess.PieceType] = [
     chess.QUEEN,
@@ -127,6 +129,10 @@ class GameScene:
 
         # Estado para empate por acordo (apenas HUMAN_VS_HUMAN)
         self.draw_request_by: chess.Color | None = None
+
+        # Autosave: cenas carregadas de PGN não gravam autosave
+        # (o botão Carregar continua significando apenas PGN).
+        self._autosave_enabled = True
 
         # Timer para intervalo visual no modo AI_VS_AI.
         self._ai_vs_ai_timer: float = 0.0
@@ -230,11 +236,107 @@ class GameScene:
         self._sync_view()
         if self._is_ai_turn:
             self._start_ai()
+        # Nova partida em andamento: invalida o autosave anterior.
+        self._autosave()
 
     def on_exit(self) -> None:
-        """Chamado quando a cena sai da pilha (cancela IA ativa)."""
+        """Chamado quando a cena sai da pilha (cancela IA e grava autosave)."""
         self._cancel_ai()
         self._cancel_hint()
+        self._autosave()
+
+    # ── autosave ─────────────────────────────────────
+
+    def _autosave(self) -> None:
+        """Grava o autosave da partida em andamento.
+
+        Se a partida terminou, remove o autosave (o botão Continuar
+        nunca abre uma partida encerrada). Falhas são registradas no
+        log e nunca derrubam o jogo.
+        """
+        if not self._autosave_enabled:
+            return
+        try:
+            if self.game.is_game_over():
+                delete_autosave()
+            else:
+                save_state(self.to_saved_state())
+        except Exception:  # noqa: BLE001 — log e segue
+            get_logger().exception("Falha ao gravar autosave")
+
+    def to_saved_state(self) -> dict:
+        """Estado completo da partida para o autosave (JSON)."""
+        if self._white_is_ai and not self._black_is_ai:
+            ai_color = "white"
+        elif self._black_is_ai and not self._white_is_ai:
+            ai_color = "black"
+        else:
+            ai_color = None
+        return {
+            "mode": self.game_mode.name.lower(),
+            "ai_color": ai_color,
+            "ai_level": self.ai_level.name.lower(),
+            "clock_minutes": int(self.clock.initial_seconds // 60),
+            "clock_increment": int(self.clock.increment),
+            "white_time": self.clock.get_time(chess.WHITE),
+            "black_time": self.clock.get_time(chess.BLACK),
+            "flipped": self.board_view.flipped,
+            "moves": [m.uci() for m in self.game.board.move_stack],
+            "clock_history": [
+                [w, b] for (w, b) in self._clock_history
+            ],
+        }
+
+    @classmethod
+    def from_saved_state(
+        cls,
+        state: dict,
+        *,
+        scene_manager: object | None = None,
+        audio: AudioManager | None = None,
+    ) -> GameScene:
+        """Reconstrói a GameScene a partir de um autosave validado."""
+        ai_color = None
+        if state["ai_color"] == "white":
+            ai_color = chess.WHITE
+        elif state["ai_color"] == "black":
+            ai_color = chess.BLACK
+
+        scene = cls(
+            audio=audio,
+            game_mode=GameMode[state["mode"].upper()],
+            ai_color=ai_color,
+            ai_level=Level[state["ai_level"].upper()],
+            clock_minutes=state["clock_minutes"],
+            clock_increment=state["clock_increment"],
+            scene_manager=scene_manager,
+        )
+
+        # Invalida qualquer busca iniciada no __init__ (posição inicial):
+        # a posição real vem do replay abaixo.
+        scene._cancel_ai()
+
+        for uci in state["moves"]:
+            scene.game.push(chess.Move.from_uci(uci))
+
+        # Relógio: tempos restantes e histórico para o Undo.
+        scene.clock.set_time(chess.WHITE, state["white_time"])
+        scene.clock.set_time(chess.BLACK, state["black_time"])
+        if state["clock_history"] is not None:
+            scene._clock_history = list(state["clock_history"])
+
+        # Perspectiva do tabuleiro.
+        if scene.board_view.flipped != state["flipped"]:
+            scene.board_view.toggle_flip()
+
+        scene._sync_view()
+
+        # Se a IA joga agora, retomar a busca na posição restaurada
+        # (worker novo, geração nova — nada da sessão anterior reaparece).
+        if not scene.game.is_game_over() and scene._is_ai_turn:
+            scene._start_ai()
+
+        return scene
 
     # ── desfazer e desistir ───────────────────────────────
 
@@ -297,12 +399,15 @@ class GameScene:
         if self._is_ai_turn:
             self._start_ai()
 
+        self._autosave()
+
     def resign(self) -> None:
         if not self.game.is_game_over():
             self._cancel_ai()
             self._cancel_hint()
             self.game.resign(self.game.turn)
             self.audio.play("game_over")
+            self._autosave()  # partida encerrada → remove o autosave
 
     # ── timeout ───────────────────────────────────────────
 
@@ -313,6 +418,7 @@ class GameScene:
             self._cancel_hint()
             self.game.timeout(color)
             self.audio.play("game_over")
+            self._autosave()  # partida encerrada → remove o autosave
 
     # ── empate por acordo ────────────────────────────────
 
@@ -329,6 +435,7 @@ class GameScene:
             self.game.agree_draw()
             self.draw_request_by = None
             self.audio.play("game_over")
+            self._autosave()  # partida encerrada → remove o autosave
 
     # ── nova partida ─────────────────────────────────────
 
@@ -600,6 +707,11 @@ class GameScene:
             self.audio.play("move")
         if self.game.in_check():
             self.audio.play("check")
+
+        # Autosave após cada lance válido (partida encerrada → remove,
+        # o Continuar nunca abre uma partida já terminada).
+        self._autosave()
+
         if self.game.is_game_over():
             self.audio.play("game_over")
             return

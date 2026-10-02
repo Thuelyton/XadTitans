@@ -10,8 +10,8 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 | 1 | Tabuleiro na tela | ✅ |
 | 2 | Regras e jogabilidade | ✅ |
 | 3 | Visual estilo Chess Titans | ✅ |
-| 4 | Inteligência artificial | ✅|
-| 5 | Recursos do jogo | ⬜ |
+| 4 | Inteligência artificial | ✅ |
+| 5 | Recursos do jogo | ✅ |
 | 6 | Qualidade e desempenho | ⬜ |
 | 7 | Empacotamento (.exe) | ⬜ |
 | 8 | Documentação e divulgação | ⬜ |
@@ -172,7 +172,7 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 - [x] `storage/paths.py` (pasta `%APPDATA%\XadTitans` com plano B)
 - [x] Salvar partida em PGN (com cabeçalhos padrão)
 - [x] Carregar partida de um PGN
-- [ ] Autosave ao fechar e botão Continuar
+- [x] Autosave ao fechar e botão Continuar
 - [x] `settings.json` (som, volume, velocidade das animações, FPS, resolução, ajudas visuais)
 - [x] Tela de Configurações ligada ao `settings.json`
 - [x] `stats.json` e tela de estatísticas
@@ -180,11 +180,11 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 - [x] Testes de storage (salvar/carregar, autosave, arquivo corrompido)
 
 **Robustez**
-- [ ] Tratamento global de exceções: grava no log e mostra mensagem simples
-- [ ] Log com rotação e tamanho limitado
-- [ ] Commit da fase
+- [x] Tratamento global de exceções: grava no log e mostra mensagem simples
+- [x] Log com rotação e tamanho limitado
+- [x] Commit da fase
 
-**Pronto quando:** um usuário novo consegue instalar, jogar, salvar, fechar, voltar e continuar sem precisar do desenvolvedor.
+**Pronto quando:** um usuário novo consegue instalar, jogar, salvar, fechar, voltar e continuar sem precisar do desenvolvedor. ✅ (comprovado pelo smoke test headless da experiência real: abrir → nova partida → lances → fechar → reabrir → Continuar restaura posição, turno, relógio, perspectiva e Undo → finalizar → Continuar não oferece partida encerrada → nova partida → fechar/reabrir.)
 
 ---
 

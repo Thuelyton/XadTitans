@@ -81,6 +81,9 @@ class LoadScene:
             game_scene = GameScene(audio=self.audio)
             game_scene.game.board = final_board
             game_scene._sync_view()
+            # Partidas vindas de PGN não gravam autosave — o botão
+            # Carregar continua significando apenas PGN.
+            game_scene._autosave_enabled = False
             self.scene_manager.switch(game_scene)
 
     def _go_back(self) -> None:

@@ -28,6 +28,11 @@ class SceneManager:
         """Quantidade de cenas na pilha."""
         return len(self._stack)
 
+    @property
+    def scenes(self) -> tuple[Any, ...]:
+        """Cópia da pilha de cenas (da primeira para a atual)."""
+        return tuple(self._stack)
+
     def push(self, scene: Any) -> None:
         """Empilha uma nova cena e aciona hooks de ciclo de vida."""
         prev = self.current
@@ -93,5 +98,9 @@ class SceneManager:
         if callable(method):
             try:
                 method()
-            except Exception:  # noqa: BLE001, S110
-                pass
+            except Exception:  # noqa: BLE001 — nunca derrubar a troca de cena
+                from xadtitans.utils.logger import get_logger
+
+                get_logger().exception(
+                    "Exceção no ciclo de vida da cena (%s)", method_name
+                )

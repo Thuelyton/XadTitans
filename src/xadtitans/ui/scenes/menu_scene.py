@@ -18,6 +18,7 @@ import pygame
 from xadtitans.audio import AudioManager
 from xadtitans.config import COLOR_BG, WINDOW_HEIGHT, WINDOW_WIDTH
 from xadtitans.i18n import t
+from xadtitans.storage.autosave import autosave_exists, load_state
 from xadtitans.storage.paths import autosave_file
 from xadtitans.storage.pgn import list_pgn_files
 from xadtitans.ui.widgets.button import Button
@@ -84,8 +85,24 @@ class MenuScene:
 
     def _on_continue(self) -> None:
         self.audio.play("click")
-        if not autosave_file().exists():
+        if self.scene_manager is None:
+            return
+        if not autosave_exists():
             self._show_message(t("load.no_autosave"))
+            return
+        state = load_state()
+        if state is None:
+            # Autosave corrompido/incompatível: já foi para quarentena
+            # e o problema foi registrado no log. O jogo segue normal.
+            self._show_message(t("load.autosave_corrupted"))
+            self._build_buttons()
+            return
+        from xadtitans.ui.scenes.game_scene import GameScene
+
+        game_scene = GameScene.from_saved_state(
+            state, scene_manager=self.scene_manager, audio=self.audio
+        )
+        self.scene_manager.switch(game_scene)
 
     def _on_load(self) -> None:
         self.audio.play("click")

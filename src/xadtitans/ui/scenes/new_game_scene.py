@@ -185,6 +185,9 @@ class NewGameScene:
                 clock_minutes=clock_min,
                 clock_increment=increment_sec,
             )
+            # Nova partida: invalida o autosave anterior logo de início
+            # (o Continuar nunca reabre a partida antiga).
+            game_scene._autosave()
             # Substitui a tela de Nova Partida pela GameScene
             self.scene_manager.switch(game_scene)
 
