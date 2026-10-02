@@ -154,30 +154,30 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 ## FASE 5 — Recursos do jogo
 
 **Menus e fluxo**
-- [ ] Menu principal: Novo jogo, Continuar, Carregar, Configurações, Sair
-- [ ] Tela Nova partida: modo (vs IA / 2 jogadores), cor, nível, relógio
-- [ ] Gerenciador de cenas completo (voltar, trocar, empilhar)
-- [ ] `i18n.py` com todos os textos em pt-BR
+- [x] Menu principal: Novo jogo, Continuar, Carregar, Configurações, Sair
+- [x] Tela Nova partida: modo (vs IA / 2 jogadores), cor, nível, relógio
+- [x] Gerenciador de cenas completo (voltar, trocar, empilhar)
+- [x] `i18n.py` com todos os textos em pt-BR
 
 **Partida**
-- [ ] Relógio de xadrez (sem relógio, 3, 5, 10, 15 min, incremento opcional)
-- [ ] Fim de partida por tempo esgotado
-- [ ] Dica de jogada (usa a IA)
-- [ ] Virar o tabuleiro (e virar automático no modo 2 jogadores)
-- [ ] Empate por acordo (modo 2 jogadores)
-- [ ] Desfazer contra a IA (desfaz o par de lances)
-- [ ] Atalhos de teclado (`Esc`, `U`, `F`, `H`, `N`)
+- [x] Relógio de xadrez (sem relógio, 3, 5, 10, 15 min, incremento opcional)
+- [x] Fim de partida por tempo esgotado
+- [x] Dica de jogada (usa a IA)
+- [x] Virar o tabuleiro (e virar automático no modo 2 jogadores)
+- [x] Empate por acordo (modo 2 jogadores)
+- [x] Desfazer contra a IA (desfaz o par de lances)
+- [x] Atalhos de teclado (`Esc`, `U`, `F`, `H`, `N`)
 
 **Persistência**
-- [ ] `storage/paths.py` (pasta `%APPDATA%\XadTitans` com plano B)
-- [ ] Salvar partida em PGN (com cabeçalhos padrão)
-- [ ] Carregar partida de um PGN
+- [x] `storage/paths.py` (pasta `%APPDATA%\XadTitans` com plano B)
+- [x] Salvar partida em PGN (com cabeçalhos padrão)
+- [x] Carregar partida de um PGN
 - [ ] Autosave ao fechar e botão Continuar
-- [ ] `settings.json` (som, volume, velocidade das animações, FPS, resolução, ajudas visuais)
-- [ ] Tela de Configurações ligada ao `settings.json`
-- [ ] `stats.json` e tela de estatísticas
-- [ ] Arquivos ausentes ou corrompidos voltam ao padrão sem travar
-- [ ] Testes de storage (salvar/carregar, autosave, arquivo corrompido)
+- [x] `settings.json` (som, volume, velocidade das animações, FPS, resolução, ajudas visuais)
+- [x] Tela de Configurações ligada ao `settings.json`
+- [x] `stats.json` e tela de estatísticas
+- [x] Arquivos ausentes ou corrompidos voltam ao padrão sem travar
+- [x] Testes de storage (salvar/carregar, autosave, arquivo corrompido)
 
 **Robustez**
 - [ ] Tratamento global de exceções: grava no log e mostra mensagem simples

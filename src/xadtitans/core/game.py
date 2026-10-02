@@ -42,8 +42,10 @@ class Game:
         # Peças capturadas por cada cor (na ordem das capturas).
         self._captured_by_white: list[chess.PieceType] = []
         self._captured_by_black: list[chess.PieceType] = []
-        # Cor que desistiu (None = ninguém desistiu).
+        # Cor que desistiu ou sofreu timeout (None = ninguém).
         self._resigned: chess.Color | None = None
+        self._timeout_color: chess.Color | None = None
+        self._draw_agreed: bool = False
 
     # ── estado básico ────────────────────────────────────
 
@@ -54,6 +56,8 @@ class Game:
         self._captured_by_white.clear()
         self._captured_by_black.clear()
         self._resigned = None
+        self._timeout_color = None
+        self._draw_agreed = False
 
     @property
     def turn(self) -> chess.Color:
@@ -105,9 +109,11 @@ class Game:
     def undo(self) -> chess.Move | None:
         """Desfaz o último lance (ou None se não houver histórico).
 
-        Também reverte SAN, peças capturadas e desistência.
+        Também reverte SAN, peças capturadas e desistência/timeout/empate.
         """
         self._resigned = None
+        self._timeout_color = None
+        self._draw_agreed = False
         if not self.board.move_stack:
             return None
         move = self.board.peek()
@@ -143,8 +149,8 @@ class Game:
 
     def is_game_over(self) -> bool:
         """True se a partida terminou (inclui desistência e empates
-        reivindicáveis — 50 lances e tripla repetição)."""
-        if self._resigned is not None:
+        reivindicáveis — 50 lances e tripla repetição, além de timeout/empate)."""
+        if self._resigned is not None or self._timeout_color is not None or self._draw_agreed:
             return True
         # claim_draw=True: encerra em 50 lances / tripla repetição
         # reivindicáveis, sem exigir botão de "empate".
@@ -162,6 +168,16 @@ class Game:
                 status=Status.DESISTENCIA,
                 winner=not self._resigned,  # quem não desistiu vence
             )
+        if self._timeout_color is not None:
+            return GameResult(
+                status=Status.TEMPO_ESGOTADO,
+                winner=not self._timeout_color,
+            )
+        if self._draw_agreed:
+            return GameResult(
+                status=Status.EMPATE_ACORDO,
+                winner=None,
+            )
         outcome = self.board.outcome(claim_draw=True)
         if outcome is None:
             return None
@@ -175,6 +191,14 @@ class Game:
     def resign(self, color: chess.Color) -> None:
         """A cor ``color`` desiste; a adversária vence."""
         self._resigned = color
+
+    def timeout(self, color: chess.Color) -> None:
+        """O tempo da cor ``color`` esgotou; a adversária vence."""
+        self._timeout_color = color
+
+    def agree_draw(self) -> None:
+        """Os jogadores concordaram em empatar a partida."""
+        self._draw_agreed = True
 
     # ── empates reivindicáveis (expostos pelo python-chess) ──
 

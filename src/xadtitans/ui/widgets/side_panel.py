@@ -6,12 +6,16 @@ Widget da Fase 3.  A formatação das jogadas (``format_move_pairs``)
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import pygame
 
+from xadtitans.i18n import t
+
 if TYPE_CHECKING:
+    from xadtitans.core.clock import ChessClock
     from xadtitans.core.game import Game
     from xadtitans.ui.board_view import BoardView
 
@@ -59,7 +63,9 @@ class SidePanel:
 
     # ── desenho ──────────────────────────────────────────
 
-    def draw(self, surface: pygame.Surface, game: Game) -> None:
+    def draw(
+        self, surface: pygame.Surface, game: Game, clock: ChessClock | None = None
+    ) -> None:
         pygame.draw.rect(surface, _BG, self.rect)
         pygame.draw.rect(surface, _BORDER, self.rect, 1)
 
@@ -72,8 +78,8 @@ class SidePanel:
         surface.blit(title, (x, y))
         y += 34
 
-        # Turno / status
-        y = self._draw_status(surface, game, x, y, w)
+        # Turno / status e Relógio
+        y = self._draw_status(surface, game, clock, x, y, w)
         y += 10
 
         # Peças capturadas
@@ -104,6 +110,7 @@ class SidePanel:
         self,
         surface: pygame.Surface,
         game: Game,
+        clock: ChessClock | None,
         x: int,
         y: int,
         w: int,
@@ -118,7 +125,24 @@ class SidePanel:
             text = "Vez das brancas" if game.turn else "Vez das pretas"
         rendered = self._font.render(text, True, _TEXT)
         surface.blit(rendered, (x, y))
-        return y + _LINE_H + 4
+        y += _LINE_H
+
+        if clock is not None and clock.is_active:
+            w_sec = math.ceil(clock.get_time(True))
+            b_sec = math.ceil(clock.get_time(False))
+
+            w_text = f"{t('color.white')}: {w_sec // 60:02d}:{w_sec % 60:02d}"
+            b_text = f"{t('color.black')}: {b_sec // 60:02d}:{b_sec % 60:02d}"
+
+            c_white = _TITLE if game.turn else _TEXT
+            c_black = _TITLE if not game.turn else _TEXT
+
+            surface.blit(self._font.render(w_text, True, c_white), (x, y))
+            y += _LINE_H
+            surface.blit(self._font.render(b_text, True, c_black), (x, y))
+            y += _LINE_H
+
+        return y + 4
 
     def _draw_captures(
         self,

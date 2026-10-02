@@ -51,7 +51,23 @@ TEXTS: dict[str, str] = {
     "new_game.level": "Dificuldade da IA",
     "new_game.clock": "Relógio",
     "new_game.clock_none": "Sem relógio",
+    "new_game.clock_3": "3 min",
+    "new_game.clock_5": "5 min",
+    "new_game.clock_10": "10 min",
+    "new_game.clock_15": "15 min",
+    "new_game.increment": "Incremento",
+    "new_game.inc_none": "Sem incremento",
+    "new_game.inc_2": "+2 seg/lance",
+    "new_game.inc_3": "+3 seg/lance",
+    "new_game.inc_5": "+5 seg/lance",
+    "new_game.inc_10": "+10 seg/lance",
     "new_game.start": "Iniciar Partida",
+    # Partida — mensagens de estado adicionais
+    "game.hint_searching": "Procurando dica...",
+    "game.draw_request_sent": "Empate solicitado. Aguarde resposta.",
+    "game.draw_accepted": "Empate por acordo!",
+    "game.draw_declined": "Empate recusado.",
+    "settings.saved": "Configurações salvas!",
     # Tela de Configurações
     "settings.title": "Configurações",
     "settings.volume": "Volume do Som",
@@ -79,8 +95,11 @@ TEXTS: dict[str, str] = {
     "game.game_over": "Fim de partida",
     "game.wins": "vencem",
     "game.resigned_wins": "vencem por desistência",
+    "game.timeout_wins": "vencem por tempo",
     "game.draw": "Empate",
+    "game.draw_agreed": "Empate por acordo",
     "hint.endgame": "Enter: nova partida    Esc: voltar ao menu",
+    "game.draw_request": "oferecem empate. Y para aceitar, N recusar",
 }
 
 

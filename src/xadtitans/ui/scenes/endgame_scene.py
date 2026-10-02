@@ -19,13 +19,16 @@ if TYPE_CHECKING:
 
 
 def result_text(result: GameResult) -> str:
-    """Texto legível do resultado, em pt-BR."""
+    """Texto legível do resultado, em pt-BR usando i18n."""
     if result.winner is None:
-        return f"Empate — {result.status.value}"
+        return f"{t('game.draw')} — {result.status.value}"
     vencedor = "Brancas" if result.winner else "Pretas"
-    verbo = "vencem por desistência" if (
-        result.status is Status.DESISTENCIA
-    ) else "vencem"
+    if result.status is Status.DESISTENCIA:
+        verbo = t("game.resigned_wins")
+    elif result.status is Status.TEMPO_ESGOTADO:
+        verbo = t("game.timeout_wins")
+    else:
+        verbo = t("game.wins")
     return f"{vencedor} {verbo} — {result.status.value}"
 
 

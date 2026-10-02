@@ -62,13 +62,25 @@ class NewGameScene:
 
         clock_options = [
             ("none", t("new_game.clock_none")),
+            (3, t("new_game.clock_3")),
+            (5, t("new_game.clock_5")),
+            (10, t("new_game.clock_10")),
+            (15, t("new_game.clock_15")),
+        ]
+
+        increment_options = [
+            (0, t("new_game.inc_none")),
+            (2, t("new_game.inc_2")),
+            (3, t("new_game.inc_3")),
+            (5, t("new_game.inc_5")),
+            (10, t("new_game.inc_10")),
         ]
 
         # ── Posicionamento dos controles ──────────────────────
         left_x = WINDOW_WIDTH // 2 - 220
-        start_y = 160
-        row_h = 65
-        sel_w, sel_h = 240, 40
+        start_y = 150
+        row_h = 55
+        sel_w, sel_h = 240, 35
 
         self.sel_mode = Selector(
             rect=(left_x + 200, start_y, sel_w, sel_h),
@@ -93,12 +105,18 @@ class NewGameScene:
             rect=(left_x + 200, start_y + row_h * 3, sel_w, sel_h),
             options=clock_options,
             current_index=0,
-            enabled=False,  # Relógio desabilitado na 5.4
+            on_change=self._on_clock_change,
+        )
+
+        self.sel_inc = Selector(
+            rect=(left_x + 200, start_y + row_h * 4, sel_w, sel_h),
+            options=increment_options,
+            current_index=0,
         )
 
         # Botões Iniciar e Voltar
         btn_w, btn_h = 200, 48
-        btn_y = start_y + row_h * 4 + 20
+        btn_y = start_y + row_h * 5 + 10
         self.btn_start = Button(
             rect=(WINDOW_WIDTH // 2 - btn_w - 15, btn_y, btn_w, btn_h),
             text=t("new_game.start"),
@@ -115,6 +133,9 @@ class NewGameScene:
     def _on_mode_change(self, mode: GameMode) -> None:
         self._update_visibility()
 
+    def _on_clock_change(self, clock_val: str | int) -> None:
+        self._update_visibility()
+
     def _update_visibility(self) -> None:
         mode = self.sel_mode.value
         if mode == GameMode.HUMAN_VS_HUMAN:
@@ -127,11 +148,21 @@ class NewGameScene:
             self.sel_side.enabled = False
             self.sel_level.enabled = True
 
+        clock_val = self.sel_clock.value
+        if clock_val == "none":
+            self.sel_inc.enabled = False
+            self.sel_inc.value = 0
+        else:
+            self.sel_inc.enabled = True
+
     def _start_game(self) -> None:
         self.audio.play("click")
         mode: GameMode = self.sel_mode.value
         level: Level = self.sel_level.value
         side_choice = self.sel_side.value
+        clock_val = self.sel_clock.value
+        clock_min = 0 if clock_val == "none" else int(clock_val)
+        increment_sec = int(self.sel_inc.value)
 
         ai_color: chess.Color | None = None
         if mode == GameMode.HUMAN_VS_AI:
@@ -151,6 +182,8 @@ class NewGameScene:
                 game_mode=mode,
                 ai_color=ai_color,
                 ai_level=level,
+                clock_minutes=clock_min,
+                clock_increment=increment_sec,
             )
             # Substitui a tela de Nova Partida pela GameScene
             self.scene_manager.switch(game_scene)
@@ -179,6 +212,8 @@ class NewGameScene:
             return
         if self.sel_clock.handle_event(event):
             return
+        if self.sel_inc.handle_event(event):
+            return
 
         if self.btn_start.handle_event(event):
             return
@@ -191,6 +226,7 @@ class NewGameScene:
         self.sel_side.update_hover(pos)
         self.sel_level.update_hover(pos)
         self.sel_clock.update_hover(pos)
+        self.sel_inc.update_hover(pos)
         self.btn_start.update_hover(pos)
         self.btn_back.update_hover(pos)
 
@@ -204,14 +240,15 @@ class NewGameScene:
 
         # Rótulos e Seletores
         left_x = WINDOW_WIDTH // 2 - 220
-        start_y = 165
-        row_h = 65
+        start_y = 155
+        row_h = 55
 
         rows = [
             (t("new_game.mode"), self.sel_mode),
             (t("new_game.side"), self.sel_side),
             (t("new_game.level"), self.sel_level),
             (t("new_game.clock"), self.sel_clock),
+            (t("new_game.increment"), self.sel_inc),
         ]
 
         for idx, (label_text, selector) in enumerate(rows):

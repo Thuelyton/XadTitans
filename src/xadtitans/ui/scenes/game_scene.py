@@ -8,9 +8,12 @@ Responsabilidades:
   - Sons (``audio.AudioManager``);
   - Painel lateral (jogadas em SAN + peças capturadas);
   - IA local em thread separada (``ai.worker.AIWorker``);
-  - Suporte a ``GameMode``: HUMAN_VS_HUMAN, HUMAN_VS_AI, AI_VS_AI.
+  - Suporte a ``GameMode``: HUMAN_VS_HUMAN, HUMAN_VS_AI, AI_VS_AI;
+  - Relógio de xadrez, Hint (H), empate por acordo, flip automático.
 
-Teclas: ``F`` vira o tabuleiro, ``U`` desfaz, ``R`` desiste.
+Teclas: ``Esc`` volta, ``F`` vira, ``U`` desfaz, ``R`` desiste,
+        ``H`` hint, ``N`` nova partida, ``D`` pede empate (HvH),
+        ``Y`` aceita empate, ``N`` recusa empate (quando pendente).
 """
 
 from __future__ import annotations
@@ -28,8 +31,10 @@ from xadtitans.config import (
     WINDOW_HEIGHT,
     WINDOW_WIDTH,
 )
+from xadtitans.core.clock import ChessClock
 from xadtitans.core.game import Game
 from xadtitans.core.types import GameMode, Level
+from xadtitans.i18n import t
 from xadtitans.ui.animations import FADE, SLIDE, Anim, Animator, ease_out_cubic
 from xadtitans.ui.board_view import BoardView
 from xadtitans.ui.widgets.side_panel import SidePanel
@@ -68,11 +73,16 @@ class GameScene:
         ai_color: chess.Color | None = None,
         ai_level: Level = Level.MEDIO,
         ai_vs_ai_delay: float = AI_VS_AI_DELAY,
+        clock_minutes: int = 0,
+        clock_increment: int = 0,
+        scene_manager: object | None = None,
     ) -> None:
         self.game = Game()
+        self.clock = ChessClock(minutes=clock_minutes, increment=clock_increment)
         self.board_view = BoardView()
         self.audio = audio or AudioManager()
         self.animator = Animator()
+        self.scene_manager = scene_manager
         self._sync_view()
 
         self.side_panel = SidePanel(
@@ -105,6 +115,19 @@ class GameScene:
         # Incrementa a cada nova partida ou cancelamento.
         self._generation: int = 0
 
+        # Worker exclusivo para dicas (Hint — tecla H)
+        self._hint_worker: AIWorker | None = None
+        self._hint_gen: int = 0
+        self._hint_request_gen: int = 0
+        self.hint_move: chess.Move | None = None
+
+        # Histórico do relógio: tempos (brancas, pretas) antes de cada
+        # lance — usado para restaurar o relógio no Undo.
+        self._clock_history: list[tuple[float, float]] = []
+
+        # Estado para empate por acordo (apenas HUMAN_VS_HUMAN)
+        self.draw_request_by: chess.Color | None = None
+
         # Timer para intervalo visual no modo AI_VS_AI.
         self._ai_vs_ai_timer: float = 0.0
 
@@ -112,7 +135,7 @@ class GameScene:
         self.pending_promotion: tuple[int, int] | None = None
         self._promo_rects: list[tuple[pygame.Rect, chess.PieceType]] = []
 
-        # Fonte para "Pensando..."
+        # Fonte para "Pensando..." / textos de overlay
         self._thinking_font = pygame.font.SysFont("arial", 20, bold=True)
 
         # Orientação do tabuleiro
@@ -133,25 +156,50 @@ class GameScene:
         elif event.type == pygame.MOUSEMOTION:
             self._on_hover(event.pos)
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_f:
-                self.board_view.toggle_flip()
-                self.animator.clear()
-            elif event.key == pygame.K_u:
-                self.undo()
-            elif event.key == pygame.K_r:
-                self.resign()
+            self._handle_keydown(event.key)
+
+    def _handle_keydown(self, key: int) -> None:
+        """Trata teclas de atalho dentro da GameScene."""
+        if key == pygame.K_f:
+            self.board_view.toggle_flip()
+            self.animator.clear()
+        elif key == pygame.K_u:
+            self.undo()
+        elif key == pygame.K_r:
+            self.resign()
+        elif key == pygame.K_h:
+            self._request_hint()
+        elif key == pygame.K_d:
+            self._request_draw()
+        elif key == pygame.K_y and self.draw_request_by is not None:
+            self._accept_draw()
+        elif key == pygame.K_n:
+            # Se há pedido de empate pendente, N recusa; caso contrário, nova partida
+            if self.draw_request_by is not None:
+                self.draw_request_by = None
+            else:
+                self._new_game_shortcut()
 
     def update(self, dt: float) -> None:
         self.animator.update(dt)
         self._update_ai_vs_ai_timer(dt)
         self._poll_ai()
+        self._poll_hint()
+        if not self.game.is_game_over() and not self.animator.blocking:
+            self.clock.tick(dt, self.game.turn)
+            if self.clock.is_timeout(self.game.turn):
+                self._handle_timeout(self.game.turn)
 
     def draw(self, surface: pygame.Surface) -> None:
         surface.fill(COLOR_BG)
         self.board_view.draw(surface, anims=self.animator.by_square())
-        self.side_panel.draw(surface, self.game)
+        if self.hint_move is not None:
+            self._draw_hint(surface)
+        self.side_panel.draw(surface, self.game, clock=self.clock)
         self._draw_promotion_dialog(surface)
         self._draw_thinking(surface)
+        self._draw_hint_searching(surface)
+        self._draw_draw_request(surface)
 
     # ── propriedades de modo de jogo ──────────────────────
 
@@ -170,9 +218,13 @@ class GameScene:
 
     def new_game(self) -> None:
         self.game.reset()
+        self.clock.reset()
+        self._clock_history.clear()
         self.animator.clear()
         self.pending_promotion = None
         self._cancel_ai()
+        self._cancel_hint()
+        self.draw_request_by = None
         self._generation += 1
         self._ai_vs_ai_timer = 0.0
         self._sync_view()
@@ -182,6 +234,7 @@ class GameScene:
     def on_exit(self) -> None:
         """Chamado quando a cena sai da pilha (cancela IA ativa)."""
         self._cancel_ai()
+        self._cancel_hint()
 
     # ── desfazer e desistir ───────────────────────────────
 
@@ -189,6 +242,8 @@ class GameScene:
         # Cancelar IA ativa e limpar timer
         if self._ai_worker is not None and self._ai_worker.busy:
             self._cancel_ai()
+        self._cancel_hint()
+        self.draw_request_by = None
         self._ai_vs_ai_timer = 0.0
 
         if not self.game.board.move_stack:
@@ -217,8 +272,22 @@ class GameScene:
             if ai_played_last:
                 undo_count = 2
 
-        for _ in range(min(undo_count, len(self.game.board.move_stack))):
+        n = min(undo_count, len(self.game.board.move_stack))
+        for _ in range(n):
             self.game.undo()
+
+        # Restaurar o relógio para os tempos de antes do primeiro lance
+        # desfeito (reverte também os incrementos aplicados).
+        if n > 0:
+            if len(self._clock_history) >= n:
+                w_time, b_time = self._clock_history[-n]
+                del self._clock_history[-n:]
+                self.clock.set_time(chess.WHITE, w_time)
+                self.clock.set_time(chess.BLACK, b_time)
+            else:
+                # Histórico dessincronizado (ex.: partida carregada):
+                # descartar em vez de restaurar valores errados.
+                self._clock_history.clear()
 
         self.animator.clear()
         self.pending_promotion = None
@@ -231,8 +300,87 @@ class GameScene:
     def resign(self) -> None:
         if not self.game.is_game_over():
             self._cancel_ai()
+            self._cancel_hint()
             self.game.resign(self.game.turn)
             self.audio.play("game_over")
+
+    # ── timeout ───────────────────────────────────────────
+
+    def _handle_timeout(self, color: chess.Color) -> None:
+        """Chamado quando o tempo de `color` esgota."""
+        if not self.game.is_game_over():
+            self._cancel_ai()
+            self._cancel_hint()
+            self.game.timeout(color)
+            self.audio.play("game_over")
+
+    # ── empate por acordo ────────────────────────────────
+
+    def _request_draw(self) -> None:
+        """Solicita empate (apenas HvH)."""
+        if self.game_mode == GameMode.HUMAN_VS_HUMAN and not self.game.is_game_over():
+            self.draw_request_by = self.game.turn
+
+    def _accept_draw(self) -> None:
+        """Aceita o pedido de empate."""
+        if not self.game.is_game_over():
+            self._cancel_ai()
+            self._cancel_hint()
+            self.game.agree_draw()
+            self.draw_request_by = None
+            self.audio.play("game_over")
+
+    # ── nova partida ─────────────────────────────────────
+
+    def _new_game_shortcut(self) -> None:
+        """Abre NewGameScene via SceneManager se disponível."""
+        if self.scene_manager is not None:
+            from xadtitans.ui.scenes.new_game_scene import NewGameScene
+            self.scene_manager.push(NewGameScene(self.scene_manager, self.audio))
+
+    # ── hint (tecla H) ───────────────────────────────────
+
+    def _cancel_hint(self) -> None:
+        """Invalida hint atual e cancela worker de dica."""
+        self._hint_gen += 1
+        self.hint_move = None
+        if self._hint_worker is not None:
+            self._hint_worker.cancel()
+            self._hint_worker = None
+
+    def _request_hint(self) -> None:
+        """Solicita dica de lance ao motor de IA em background."""
+        if self.game.is_game_over() or self._is_ai_turn:
+            return
+        if self._hint_worker is not None and self._hint_worker.busy:
+            return
+        self.hint_move = None
+        self._hint_gen += 1
+        self._hint_request_gen = self._hint_gen
+        # MEDIO: profundidade 4 — sugestão forte e rápida (DIFICIL
+        # demora demais para uma dica interativa).
+        self._hint_worker = AIWorker(self.game.board.copy(), level=Level.MEDIO)
+        self._hint_worker.request()
+
+    def _poll_hint(self) -> None:
+        """Verifica se o worker de hint terminou e aplica resultado."""
+        if self._hint_worker is None or self._hint_worker.busy:
+            return
+        worker = self._hint_worker
+        self._hint_worker = None
+        # Busca obsoleta (cancelada/nova geração) → ignorar resultado.
+        if self._hint_request_gen != self._hint_gen:
+            return
+        move = worker.poll()
+        if move is not None:
+            self.hint_move = move
+
+    def _draw_hint(self, surface: pygame.Surface) -> None:
+        """Destaca as casas de origem e destino do lance sugerido."""
+        if self.hint_move is not None:
+            for sq in (self.hint_move.from_square, self.hint_move.to_square):
+                cx, cy = self.board_view._center(sq)
+                pygame.draw.circle(surface, (0, 220, 80), (int(cx), int(cy)), 14, 3)
 
     # ── IA ────────────────────────────────────────────────
 
@@ -298,7 +446,7 @@ class GameScene:
             and self._ai_worker.busy
             and not self.game.is_game_over()
         ):
-            text = self._thinking_font.render("Pensando...", True, (255, 215, 0))
+            text = self._thinking_font.render(t("game.thinking"), True, (255, 215, 0))
             surface.blit(
                 text,
                 (
@@ -306,6 +454,39 @@ class GameScene:
                     WINDOW_HEIGHT - 30,
                 ),
             )
+
+    def _draw_hint_searching(self, surface: pygame.Surface) -> None:
+        """Indicador de busca de dica em andamento (tecla H)."""
+        if (
+            self._hint_worker is not None
+            and self._hint_worker.busy
+            and not self.game.is_game_over()
+        ):
+            text = self._thinking_font.render(
+                t("game.hint_searching"), True, (0, 220, 80)
+            )
+            surface.blit(
+                text,
+                (
+                    BOARD_PERSP_X + 10,
+                    WINDOW_HEIGHT - 30,
+                ),
+            )
+
+    def _draw_draw_request(self, surface: pygame.Surface) -> None:
+        """Mostra overlay quando há pedido de empate pendente."""
+        if self.draw_request_by is None:
+            return
+        color_name = t("color.white") if self.draw_request_by else t("color.black")
+        msg = f"{color_name} {t('game.draw_request')}"
+        text = self._thinking_font.render(msg, True, (255, 215, 0))
+        surface.blit(
+            text,
+            (
+                BOARD_PERSP_X + 10,
+                WINDOW_HEIGHT - 60,
+            ),
+        )
 
     # ── sincronização com a visão ─────────────────────────
 
@@ -386,8 +567,30 @@ class GameScene:
                     )
                 )
 
-        # Regras + som
+        # Regras
+        # Snapshot do relógio antes do lance (para restaurar no Undo).
+        self._clock_history.append(
+            (self.clock.get_time(chess.WHITE), self.clock.get_time(chess.BLACK))
+        )
         self.game.push(move)
+        # Aplicar incremento: o jogador que acabou de mover é `not self.game.turn`
+        # (turn já alternado após push)
+        self.clock.apply_increment(not self.game.turn)
+
+        # Limpar hint e pedido de empate após cada lance
+        self._cancel_hint()
+        self.draw_request_by = None
+
+        # Rotação automática do tabuleiro no modo HvH
+        if (
+            self.game_mode == GameMode.HUMAN_VS_HUMAN
+            and (
+                (self.game.turn == chess.WHITE and self.board_view.flipped)
+                or (self.game.turn == chess.BLACK and not self.board_view.flipped)
+            )
+        ):
+            self.board_view.toggle_flip()
+
         self.pending_promotion = None
         self._sync_view()
 
@@ -399,6 +602,16 @@ class GameScene:
             self.audio.play("check")
         if self.game.is_game_over():
             self.audio.play("game_over")
+            return
+
+        # Se o lance deixou a vez da IA, iniciar a busca dela
+        # (no modo AI_VS_AI o intervalo visual é agendado em ``_poll_ai``).
+        if (
+            self.game_mode != GameMode.AI_VS_AI
+            and self._is_ai_turn
+            and self._ai_worker is None
+        ):
+            self._start_ai()
 
     # ── interação ─────────────────────────────────────────
 

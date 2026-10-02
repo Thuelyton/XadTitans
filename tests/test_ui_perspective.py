@@ -31,8 +31,11 @@ def _screen() -> pygame.Surface:
 
 
 def _click(scene: GameScene, sq: int) -> None:
+    # Clica exatamente no ponto de apoio da casa: funciona em ambas as
+    # orientações (com o virar automático do HvH, as casas distantes ficam
+    # pequenas e um deslocamento fixo sairia da casa).
     fx, fy = scene.board_view.piece_anchor(sq)
-    scene._on_left_click((int(fx), int(fy) - 20))
+    scene._on_left_click((int(fx), int(fy)))
 
 
 def _finish_animations(scene: GameScene) -> None:
