@@ -7,12 +7,16 @@ este lance" (pois lances equivalentes são legítimos).
 
 from __future__ import annotations
 
+import json
 import threading
+import time
+from pathlib import Path
 
 import chess
 import pytest
 
-from xadtitans.ai.evaluation import evaluate
+import xadtitans.ai.search as search_mod
+from xadtitans.ai.evaluation import clear_caches, evaluate
 from xadtitans.ai.search import (
     EXACT,
     LOWERBOUND,
@@ -22,7 +26,7 @@ from xadtitans.ai.search import (
     iterative_deepening,
     mate_in,
 )
-from xadtitans.ai.worker import AIWorker
+from xadtitans.ai.worker import _TIME_LIMIT, AIWorker
 from xadtitans.core.types import Level
 
 # ════════════════════════════════════════════════════════════
@@ -72,6 +76,20 @@ class TestEvaluation:
         s_good = evaluate(b_good)
         s_bad = evaluate(b_bad)
         assert s_bad < s_good
+
+    def test_scores_equivalentes_a_baseline(self) -> None:
+        """Guarda de equivalência: as otimizações de desempenho da
+        Etapa 6.4 não podem alterar os valores de avaliação.
+        ``eval_equivalence.json`` registra os scores produzidos pelo
+        código original (commit 4154e98) para 54 posições + 1 caso
+        com pilha de lances."""
+        fixture = Path(__file__).parent / "eval_equivalence.json"
+        data = json.loads(fixture.read_text(encoding="utf-8"))
+        clear_caches()  # mede o caminho frio também
+        for fen, expected in zip(data["fens"], data["scores"]):
+            assert evaluate(chess.Board(fen)) == expected, fen
+        board = chess.Board(data["stack_fen"])
+        assert evaluate(board) == data["stack_score"]
 
 
 # ════════════════════════════════════════════════════════════
@@ -402,4 +420,221 @@ class TestAISearchAndWorkerEdgeCases:
             worker.request()
             move = worker.wait(timeout=5.0)
             assert move in board.legal_moves
+
+
+# ══════════════════════════════════════════════════════════
+# Limite de tempo (``time_limit``) — Etapa 6.4
+# ══════════════════════════════════════════════════════════
+
+_HARD_FEN = (
+    "r1bq1rk1/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 0 7"
+)
+
+
+class _FakeClock:
+    """Relógio controlável: avança ``step`` segundos por chamada."""
+
+    def __init__(self, step: float = 1.0) -> None:
+        self.step = step
+        self.now = 0.0
+        self.calls = 0
+
+    def __call__(self) -> float:
+        self.calls += 1
+        self.now += self.step
+        return self.now
+
+
+class _CountingClock:
+    """Relógio real que conta chamadas (calibração de nós)."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self) -> float:
+        self.calls += 1
+        return time.monotonic()
+
+
+class TestTimeLimit:
+    """Comportamento do ``time_limit`` em iterative_deepening.
+
+    Testes de mecanismo usam relógio controlado (determinístico);
+    testes de duração real usam margens generosas (smoke, CI-safe).
+    """
+
+    # ── Mecanismo determinístico (relógio controlado) ──────
+
+    def test_limite_expirado_antes_da_primeira_iteracao(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Timeout imediato: fallback legal, profundidade 0, sem crash."""
+        board = chess.Board(_HARD_FEN)
+        fen_antes = board.fen()
+        clock = _FakeClock(step=1.0)
+        monkeypatch.setattr(search_mod, "_clock", clock)
+        move, score, depth, _nps = iterative_deepening(
+            board, max_depth=6, time_limit=0.5
+        )
+        assert move is not None
+        assert move in board.legal_moves
+        assert depth == 0
+        assert score == 0
+        assert board.fen() == fen_antes  # board restaurado
+
+    def test_ultima_iteracao_completa_e_depth_verdadeiro(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Interrompido na iteração 2: retorna o resultado COMPLETO da
+        iteração 1 e nunca afirma max_depth interrompido."""
+        board = chess.Board()
+
+        # Calibração: nº de chamadas de relógio para depth 1 e depth 2
+        # (time_limit enorme mantém as checagens por nó ativas)
+        c1 = _CountingClock()
+        monkeypatch.setattr(search_mod, "_clock", c1)
+        m1, _s1, d1, _ = iterative_deepening(
+            board, max_depth=1, tt=TranspositionTable(), time_limit=1e9
+        )
+        assert d1 == 1
+        c2 = _CountingClock()
+        monkeypatch.setattr(search_mod, "_clock", c2)
+        iterative_deepening(
+            board, max_depth=2, tt=TranspositionTable(), time_limit=1e9
+        )
+        calls_d1, calls_d2 = c1.calls, c2.calls
+        assert calls_d2 > calls_d1  # iteração 2 é mais cara
+
+        # Relógio falso: expira no MEIO da iteração 2
+        mid = calls_d1 + (calls_d2 - calls_d1) // 2
+        clock = _FakeClock(step=1.0)
+        monkeypatch.setattr(search_mod, "_clock", clock)
+        move, _score, depth, _nps = iterative_deepening(
+            board, max_depth=2, tt=TranspositionTable(), time_limit=float(mid)
+        )
+        assert depth == 1  # última iteração COMPLETA
+        assert depth < 2  # nunca afirma max_depth interrompido
+        assert move is not None and move in board.legal_moves
+        assert move == m1  # mesmo lance da iteração 1 completa
+
+    def test_sem_time_limit_comportamento_anterior(self) -> None:
+        """Sem time_limit: busca completa até max_depth (compatível)."""
+        board = chess.Board()
+        move, _score, depth, _nps = iterative_deepening(board, max_depth=3)
+        assert depth == 3
+        assert move is not None and move in board.legal_moves
+
+    def test_limite_generoso_completa_profundidade(self) -> None:
+        """Com tempo folgado, a profundidade máxima é alcançada."""
+        board = chess.Board()
+        move, _score, depth, _nps = iterative_deepening(
+            board, max_depth=3, time_limit=60.0
+        )
+        assert depth == 3
+        assert move is not None and move in board.legal_moves
+
+    def test_stop_event_so_continua_rapido(self) -> None:
+        """stop_event setado antes: retorna lance legal rapidamente."""
+        board = chess.Board(_HARD_FEN)
+        stop = threading.Event()
+        stop.set()
+        t0 = time.monotonic()
+        move, _score, depth, _nps = iterative_deepening(
+            board, max_depth=10, stop_event=stop, time_limit=30.0
+        )
+        assert time.monotonic() - t0 < 2.0
+        assert move is not None and move in board.legal_moves
+        assert depth == 0
+
+    def test_time_limit_e_stop_event_juntos(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Ambos ativos: stop vence; lance legal; sem travamento."""
+        board = chess.Board(_HARD_FEN)
+        stop = threading.Event()
+        stop.set()
+        clock = _FakeClock(step=1.0)
+        monkeypatch.setattr(search_mod, "_clock", clock)
+        move, _score, depth, _nps = iterative_deepening(
+            board, max_depth=10, stop_event=stop, time_limit=30.0
+        )
+        assert move is not None and move in board.legal_moves
+        assert depth == 0
+
+    def test_mate_encontrado_com_tempo_suficiente(self) -> None:
+        """Mate em 1 continua sendo encontrado com time_limit folgado."""
+        board = chess.Board("6k1/5ppp/8/8/8/8/8/R3K3 w Q - 0 1")
+        move, score, _depth, _nps = iterative_deepening(
+            board, max_depth=4, time_limit=10.0
+        )
+        assert move is not None
+        board.push(move)
+        assert board.is_checkmate() or is_mate(-score)
+
+    def test_limites_curtos_sempre_legais(self) -> None:
+        """Limites minúsculos em várias posições: sempre lance legal."""
+        fens = [
+            chess.STARTING_FEN,
+            _HARD_FEN,
+            "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2",
+            "8/5pk1/5p1p/8/8/8/4R1PK/8 w - - 0 1",
+        ]
+        for fen in fens:
+            board = chess.Board(fen)
+            for limit in (1e-9, 0.01):
+                move, _score, _depth, _nps = iterative_deepening(
+                    board, max_depth=8, time_limit=limit
+                )
+                assert move is not None, fen
+                assert move in board.legal_moves, f"{fen} -> {move}"
+
+    # ── Relógio real: margens generosas (smoke, não frágil) ──
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize("level", list(Level))
+    def test_time_limit_respeitado_por_nivel(self, level: Level) -> None:
+        """Cada nível respeita seu limite com folga generosa.
+
+        Não espera duração exata: verifica apenas que a busca
+        termina, não ultrapassa folga absurda e devolve lance legal.
+        """
+        limit = _TIME_LIMIT[level]
+        board = chess.Board(_HARD_FEN)
+        t0 = time.monotonic()
+        move, _score, depth, _nps = iterative_deepening(
+            board, max_depth=20, time_limit=limit
+        )
+        elapsed = time.monotonic() - t0
+        # Folga generosa p/ CI: limite + 80% + 2s
+        assert elapsed < limit * 1.8 + 2.0, (
+            f"{level.name}: {elapsed:.2f}s excede a folga do limite {limit}s"
+        )
+        assert move is not None and move in board.legal_moves
+        assert 0 <= depth <= 20
+
+    def test_worker_respeita_time_limit_do_nivel(self) -> None:
+        """AIWorker passa ``self._time_limit``: lance legal e duração
+        compatível com o limite do nível."""
+        board = chess.Board(_HARD_FEN)
+        worker = AIWorker(board, level=Level.INICIANTE)
+        t0 = time.monotonic()
+        worker.request()
+        move = worker.wait(timeout=15.0)
+        elapsed = time.monotonic() - t0
+        assert move is not None and move in board.legal_moves
+        assert elapsed < _TIME_LIMIT[Level.INICIANTE] * 1.8 + 2.0
+        assert not worker.busy
+
+    def test_determinismo_com_seed_e_time_limit(self) -> None:
+        """Seed determinística continua com time_limit ativo (no nível
+        INICIANTE a profundidade 2 da posição inicial é rápida e
+        completa dentro do limite, mantendo o resultado estável)."""
+        board = chess.Board()
+        results = []
+        for _ in range(2):
+            worker = AIWorker(board, level=Level.INICIANTE, seed=42)
+            worker.request()
+            results.append(worker.wait(timeout=15.0))
+        assert results[0] is not None
+        assert results[0] == results[1]
 

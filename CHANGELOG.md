@@ -61,3 +61,64 @@
   10 partidas AI vs AI headless).
 - 643 testes passando (402 originais + 173 novos das Fases 2-4);
   Ruff limpo.
+
+## [0.6.4] - 2026-10-04
+
+### Fase 6.4 — Profiling da IA, otimização incremental e `_TIME_LIMIT` real
+
+- Nova ferramenta `tools/profile_ai.py` (cProfile): posições
+  representativas, gargalos por tempo cumulativo, NPS, profundidade e
+  avaliação isolada; modos `--depths`, `--save` e `--compare`.
+- Baseline medida no commit `4154e98`: NPS 240–3000 conforme a posição;
+  avaliação 725,4 μs/chamada; no cProfile combinado (5 posições, d3)
+  `evaluate()` respondia por ~93% do tempo de busca, e
+  `can_claim_threefold_repetition` sozinho custava ~35% (laço de
+  "trêsfold jogável no próximo lance" com push + zobrist por lance
+  legal, executado em CADA avaliação com pilha de lances não vazia).
+- Otimizações incrementais — TODAS com avaliação bit a bit idêntica
+  (guarda em `tests/eval_equivalence.json` + teste de equivalência):
+  - terminal (mate/afogado) detectado pela própria mobilidade:
+    2 gerações de lances legais por avaliação em vez de 4;
+  - `_pawn_structure` calculada uma vez (era chamada 2×);
+  - janelas de peão passado e escudo do rei em máscaras
+    pré-calculadas (substituem laços `piece_at` + `chess.Piece`);
+  - laço de material/PST via `piece_map()` com contagem de bispos na
+    mesma passada;
+  - `_king_safety` reutiliza a fase já calculada;
+  - cache de mobilidade por chave de transposição (~20–33% de posições
+    repetidas na árvore; valores determinísticos; `clear_caches()`
+    para benchmarks);
+  - repetição: `is_repetition(3)` no lugar de
+    `can_claim_threefold_repetition` — mantém "posição já repetida
+    3× → 0"; descarta apenas a extensão "trêsfold alcançável jogando
+    um lance" (cara e rara). Nuance documentada; testes de empate
+    preservados.
+- Busca: `iterative_deepening(..., time_limit=)` implementado de fato —
+  deadline com `time.monotonic`, checagem a cada nó (negamax +
+  quiescence) via exceção `_TimeLimitReached` que aborta a iteração
+  parcial SEM poluir a TT; retorna o melhor resultado COMPLETO da
+  última iteração concluída dentro do limite; fallback legal
+  documentado (primeiro lance legal, profundidade 0) se nenhuma
+  iteração couber no tempo; profundidade retornada = iterações
+  realmente concluídas (corrige a imprecisão de sempre devolver
+  `max_depth`); tabuleiro restaurado após aborto.
+- `AIWorker` agora passa `self._time_limit` para a busca
+  (0,5 s / 2 s / 5 s / 15 s por nível). `stop_event`, geração,
+  request/poll/wait, cancelamento e fallback de exceção preservados.
+- Benchmark antes → depois (mesmas posições e profundidades,
+  `tools/bench_ai.py`): NPS inicial d3 1186 → 3893; Siciliana d3
+  1110 → 3375; final de torres d3 2761 → 8547; ataque ao rei d3
+  266 → 894 (≈ 3,1–3,8× em todas as posições); ataque ao rei d5
+  157,9 s → 48,6 s; Siciliana d5 36,0 s → 9,8 s; avaliação bruta
+  725,4 → 200,8 μs/chamada; cProfile combinado 358,2 s → 103,8 s
+  (3,45×). A contagem de nós é idêntica à baseline em todas as
+  posições: a árvore de busca foi preservada.
+- Comportamento com limite real por nível (teste de duração com folga
+  generosa): INICIANTE ~0,5 s, FÁCIL ~2 s, MÉDIO ~5 s, DIFÍCIL ~15 s.
+  Overshoot medido ≈ 0 para um limite de 0,5 s (teto teórico: ~15 ms
+  de granularidade do `monotonic` no Windows + custo de um nó).
+- Testes: +15 (time_limit por nível, mecanismo com relógio controlado
+  determinístico, fallback, profundidade reportada, stop_event, mate
+  com tempo suficiente, determinismo com seed, equivalência da
+  avaliação à baseline). 996 testes passando; Ruff limpo; 10 partidas
+  AI vs AI sem lances ilegais nem exceções (4–4, 2 empates).

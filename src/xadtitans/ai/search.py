@@ -16,12 +16,35 @@ MATE_SCORE = 20000.  ``mate_in(n)`` = 20000 - n.
 from __future__ import annotations
 
 import threading
+import time
 
 import chess
 
 from xadtitans.ai.evaluation import evaluate
 
 MATE_SCORE = 20000
+
+# Relógio de monotonic usado para os LIMITES DE TEMPO da busca
+# (``time.monotonic``, como pedido: adequado para deadlines de
+# 0,5–15s; substituível em testes determinísticos via monkeypatch em
+# ``xadtitans.ai.search._clock``).  A medição de NPS/tempo usa
+# ``time.perf_counter`` (resolução ~1µs; no Windows ``monotonic``
+# tem granularidade de ~15ms via GetTickCount64).
+_clock = time.monotonic
+
+# A checagem de tempo é feita a cada nó (negamax e quiescence): o
+# custo de ``_clock()`` é desprezível frente ao custo de um nó, e
+# isso limita o overshoot a aproximadamente o custo de um único nó.
+
+
+class _TimeLimitReached(Exception):
+    """Sinaliza que o limite de tempo da busca foi atingido.
+
+    A exceção desfaz o caminho atual SEM armazenar resultados
+    parciais na TT (os ``tt.store`` acontecem após o laço, então o
+    unwind por exceção os pula).  Os subárvores que concluíram antes
+    do disparo armazenaram resultados válidos.
+    """
 
 
 def mate_in(ply: int) -> int:
@@ -146,7 +169,11 @@ def _quiescence(
     ply: int,
     stop_event: threading.Event | None,
     tt: TranspositionTable,
+    deadline: float | None = None,
 ) -> int:
+    if deadline is not None and _clock() >= deadline:
+        raise _TimeLimitReached
+
     stand_pat = evaluate(board)
     if stand_pat >= beta:
         return beta
@@ -178,7 +205,9 @@ def _quiescence(
         if stop_event is not None and stop_event.is_set():
             return alpha
         board.push(move)
-        score = -_quiescence(board, -beta, -alpha, ply + 1, stop_event, tt)
+        score = -_quiescence(
+            board, -beta, -alpha, ply + 1, stop_event, tt, deadline
+        )
         board.pop()
         if score >= beta:
             return beta
@@ -202,11 +231,15 @@ def _negamax(
     tt: TranspositionTable,
     nodes: list[int],
     stop_event: threading.Event | None,
+    deadline: float | None = None,
 ) -> int:
     nodes[0] += 1
 
     if stop_event is not None and stop_event.is_set():
         return 0
+
+    if deadline is not None and _clock() >= deadline:
+        raise _TimeLimitReached
 
     # Mate distance pruning
     alpha = max(alpha, -MATE_SCORE + ply)
@@ -232,7 +265,7 @@ def _negamax(
 
     # Folha
     if depth <= 0:
-        return _quiescence(board, alpha, beta, 0, stop_event, tt)
+        return _quiescence(board, alpha, beta, 0, stop_event, tt, deadline)
 
     in_check = board.is_check()
     legal = list(board.legal_moves)
@@ -260,17 +293,17 @@ def _negamax(
         if i == 0:
             score = -_negamax(
                 board, depth - 1, -beta, -alpha, ply + 1,
-                killers, history, tt, nodes, stop_event,
+                killers, history, tt, nodes, stop_event, deadline,
             )
         else:
             score = -_negamax(
                 board, depth - 1, -alpha - 1, -alpha, ply + 1,
-                killers, history, tt, nodes, stop_event,
+                killers, history, tt, nodes, stop_event, deadline,
             )
             if alpha < score < beta:
                 score = -_negamax(
                     board, depth - 1, -beta, -score, ply + 1,
-                    killers, history, tt, nodes, stop_event,
+                    killers, history, tt, nodes, stop_event, deadline,
                 )
         board.pop()
 
@@ -305,6 +338,7 @@ def iterative_deepening(
     max_depth: int,
     tt: TranspositionTable | None = None,
     stop_event: threading.Event | None = None,
+    time_limit: float | None = None,
 ) -> tuple[chess.Move | None, int, int, float]:
     """Busca iterativa por profundidade.
 
@@ -313,20 +347,33 @@ def iterative_deepening(
         max_depth: profundidade máxima de busca.
         tt: tabela de transposição a reutilizar (criada se None).
         stop_event: sinaliza interrupção prematura da busca.
+        time_limit: limite de tempo em segundos (``None`` = sem limite).
+            O relógio é checado entre iterações e a cada nó da busca;
+            quando o tempo é atingido, a iteração em curso é abortada
+            (sem armazenar resultados parciais) e retorna-se o melhor
+            resultado COMPLETO da última iteração concluída dentro do
+            limite.  Se nenhuma iteração completa couber no limite,
+            retorna o primeiro lance legal (fallback documentado) com
+            profundidade 0.
 
     Returns:
-        (melhor_lance, pontuação, profundidade_alcançada, nós_por_segundo)
+        (melhor_lance, pontuação, profundidade_completa, nós_por_segundo)
+        — ``profundidade_completa`` é o número de iterações REALMENTE
+        concluídas (nunca afirma ``max_depth`` se a busca foi
+        interrompida antes).
     """
     if tt is None:
         tt = TranspositionTable()
     tt.clear()  # limpa uma vez no início
 
     best_move: chess.Move | None = None
-    best_score = -MATE_SCORE - 1
+    best_score = 0
+    reached_depth = 0
     nodes = [0]
 
-    import time
-    t0 = time.perf_counter()
+    t0 = _clock()  # base do deadline (monotonic)
+    deadline = t0 + time_limit if time_limit is not None else None
+    t0_measure = time.perf_counter()  # medição de NPS (alta resolução)
 
     killers: list[list[chess.Move | None]] = []
     history: dict[tuple[int, int], int] = {}
@@ -335,37 +382,57 @@ def iterative_deepening(
     if not legal_moves:
         return None, 0, 0, 0.0
     if len(legal_moves) == 1:
-        elapsed = time.perf_counter() - t0
+        elapsed = time.perf_counter() - t0_measure
         nps = nodes[0] / max(elapsed, 1e-9)
         return legal_moves[0], 0, 1, nps
+
+    # Comprimento da pilha original para restaurar em caso de aborto
+    # (a exceção de tempo desfaz o unwind sem ``board.pop()``).
+    original_stack_len = len(board.move_stack)
 
     for depth in range(1, max_depth + 1):
         if stop_event is not None and stop_event.is_set():
             break
+        if deadline is not None and _clock() >= deadline:
+            break
 
-        # TT NÃO é limpa entre iterações — reutiliza resultados
-        score = _negamax(
-            board, depth, -MATE_SCORE - 1, MATE_SCORE + 1, 0,
-            killers, history, tt, nodes, stop_event,
-        )
+        try:
+            # TT NÃO é limpa entre iterações — reutiliza resultados
+            score = _negamax(
+                board, depth, -MATE_SCORE - 1, MATE_SCORE + 1, 0,
+                killers, history, tt, nodes, stop_event, deadline,
+            )
+        except _TimeLimitReached:
+            # Iteração interrompida no meio: descarta o resultado
+            # parcial e mantém o último COMPLETO.  A TT não recebeu
+            # entradas do caminho interrompido (store após o laço).
+            break
 
         if stop_event is not None and stop_event.is_set():
             break
 
-        # Procurar o melhor lance na TT
+        # Iteração COMPLETA: registra o melhor lance e a profundidade
+        # realmente alcançada.
         tt_entry = tt.probe(board)
         if tt_entry is not None and tt_entry[3] is not None:
             best_move = tt_entry[3]
             best_score = score
+        reached_depth = depth
 
-        elapsed = time.perf_counter() - t0
-        nps = nodes[0] / max(elapsed, 1e-9)
+        if deadline is not None and _clock() >= deadline:
+            break
 
-    elapsed = time.perf_counter() - t0
+    # Restaura o board caso uma exceção de tempo tenha abortado com
+    # pushes pendentes no caminho de unwind.
+    while len(board.move_stack) > original_stack_len:
+        board.pop()
+
+    elapsed = time.perf_counter() - t0_measure
     nps = nodes[0] / max(elapsed, 1e-9)
 
-    # Se nenhum lance foi encontrado, usar o primeiro legal
+    # Nenhuma iteração completa: fallback legal documentado — o
+    # primeiro lance legal da posição (sempre um lance legal).
     if best_move is None:
         best_move = legal_moves[0]
 
-    return best_move, best_score, max_depth, nps
+    return best_move, best_score, reached_depth, nps

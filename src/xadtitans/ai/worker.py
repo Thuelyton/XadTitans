@@ -109,6 +109,7 @@ class AIWorker:
                 self._max_depth,
                 self._tt,
                 self._stop_event,
+                time_limit=self._time_limit,
             )
 
             # Aleatoriedade controlada: pode escolher entre lances

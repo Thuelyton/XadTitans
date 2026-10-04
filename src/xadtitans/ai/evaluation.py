@@ -63,6 +63,99 @@ KING_SAFETY_PENALTY_EG = -10
 TOTAL_PHASE = 24
 
 
+# ══════════════════════════════════════════════════════════
+# Máscaras de peão passado (tabela pré-calculada)
+# _PASS_WINDOWS[cor_do_peão][arquivo][rank] = quadrados inimigos
+# possivelmente relevantes (arquivos vizinhos, com skip de
+# arquivos fora do tabuleiro — igual ao laço original — à frente
+# do peão). Uma única operação bit por peão substitui o laço
+# piece_at sem alterar a condição avaliada.
+# ══════════════════════════════════════════════════════════
+
+def _build_pass_windows() -> dict[bool, tuple[tuple[int, ...], ...]]:
+    """Pré-calcula as janelas de peão passado por (cor, arquivo, rank)."""
+    tables: dict[bool, tuple[tuple[int, ...], ...]] = {}
+    for color in (chess.WHITE, chess.BLACK):
+        table = [[0] * 8 for _ in range(8)]
+        for f in range(8):
+            for r in range(8):
+                mask = 0
+                for df in (-1, 0, 1):
+                    nf = f + df
+                    if not 0 <= nf <= 7:
+                        continue
+                    ranks = range(r + 1, 8) if color else range(r)
+                    for rr in ranks:
+                        mask |= chess.BB_SQUARES[chess.square(nf, rr)]
+                table[f][r] = mask
+        tables[color] = tuple(tuple(row) for row in table)
+    return tables
+
+
+_PASS_WINDOWS: dict[bool, tuple[tuple[int, ...], ...]] = _build_pass_windows()
+
+
+def _build_shelter_fronts() -> dict[bool, tuple[tuple[int, ...], ...]]:
+    """Pré-calcula os quadrados à frente de cada (cor, arquivo, rank).
+
+    Usado pela segurança do rei: para cada arquivo vizinho ao rei,
+    existe peão próprio à frente?  (mesma condição do laço original
+    de ``piece_at`` + ``chess.Piece``).
+    """
+    tables: dict[bool, tuple[tuple[int, ...], ...]] = {}
+    for color in (chess.WHITE, chess.BLACK):
+        table = [[0] * 8 for _ in range(8)]
+        for f in range(8):
+            for r in range(8):
+                mask = 0
+                ranks = range(r + 1, 8) if color else range(r)
+                for rr in ranks:
+                    mask |= chess.BB_SQUARES[chess.square(f, rr)]
+                table[f][r] = mask
+        tables[color] = tuple(tuple(row) for row in table)
+    return tables
+
+
+_SHELTER_FRONT: dict[bool, tuple[tuple[int, ...], ...]] = _build_shelter_fronts()
+
+
+# ══════════════════════════════════════════════════════════
+# Cache de mobilidade
+# A mobilidade depende somente da posição (chave de transposição:
+# peças + lado a jogar + roques + en passant).  Cacheada porque a
+# geração de lances legais é o maior custo da avaliação e as
+# posições se repetem na árvore de busca (~20–33% de repetição).
+# Os valores são determinísticos: o cache não altera resultado.
+# ══════════════════════════════════════════════════════════
+
+_MOBILITY_CACHE: dict[int, tuple[int, int]] = {}
+_MOBILITY_CACHE_MAX = 1 << 16
+
+
+def clear_caches() -> None:
+    """Limpa os caches internos da avaliação (benchmarks e testes)."""
+    _MOBILITY_CACHE.clear()
+
+
+def _mobility(board: chess.Board) -> tuple[int, int]:
+    """Mobilidade legal de brancas e pretas ``(w, b)``."""
+    key = board._transposition_key()
+    cached = _MOBILITY_CACHE.get(key)
+    if cached is not None:
+        return cached
+    own = board.turn
+    board.turn = chess.WHITE
+    mobility_w = board.legal_moves.count()
+    board.turn = chess.BLACK
+    mobility_b = board.legal_moves.count()
+    board.turn = own
+    result = (mobility_w, mobility_b)
+    if len(_MOBILITY_CACHE) >= _MOBILITY_CACHE_MAX:
+        _MOBILITY_CACHE.clear()
+    _MOBILITY_CACHE[key] = result
+    return result
+
+
 # ════════════════════════════════════════════════════════════
 # Tabelas de posição (rank 1 no topo, index = rank*8+file)
 # Simétricas: mesma tabela para ambas as cores (espelhamento
@@ -246,33 +339,42 @@ def evaluate(board: chess.Board) -> int:
     ``tapered eval``: interpola meio-jogo e final pela fase.
     Retorna da perspectiva de quem joga (``board.turn``).
     """
-    if board.is_checkmate():
-        return -20000
-    if board.is_stalemate() or board.is_insufficient_material():
+    # Mobilidade (também detecta terminal: quem não tem lance legal
+    # está em xeque-mate ou afogado — calculada uma única vez).
+    own = board.turn
+    mobility_w, mobility_b = _mobility(board)
+
+    if (mobility_w if own else mobility_b) == 0:
+        # Sem lance legal: xeque-mate (-20000) ou afogado (0)
+        return -20000 if board.is_check() else 0
+    if board.is_insufficient_material():
         return 0
-    if board.can_claim_fifty_moves() or board.can_claim_threefold_repetition():
+    if board.can_claim_fifty_moves() or board.is_repetition(3):
         return 0
 
     mg_score = 0
     eg_score = 0
     phase = _game_phase(board)
 
-    # Material + tabelas de posição
-    for square in chess.SQUARES:
-        piece = board.piece_at(square)
-        if piece is None:
-            continue
+    # Material + tabelas de posição + contagem de bispos (uma passada)
+    wb = 0
+    bb = 0
+    for square, piece in board.piece_map().items():
         pt = piece.piece_type
+        color = piece.color
         if pt == chess.KING and phase > 8:
             continue
-        sign = 1 if piece.color else -1
-        idx = _pst_index(square, piece.color)
+        if pt == chess.BISHOP:
+            if color:
+                wb += 1
+            else:
+                bb += 1
+        sign = 1 if color else -1
+        idx = _pst_index(square, color)
         mg_score += sign * (PIECE_VALUE_MG[pt] + MG_TABLES[pt][idx])
         eg_score += sign * (PIECE_VALUE_EG[pt] + EG_TABLES[pt][idx])
 
     # Par de bispos
-    wb = len(board.pieces(chess.BISHOP, chess.WHITE))
-    bb = len(board.pieces(chess.BISHOP, chess.BLACK))
     if wb >= 2:
         mg_score += BISHOP_PAIR_BONUS_MG
         eg_score += BISHOP_PAIR_BONUS_EG
@@ -280,22 +382,17 @@ def evaluate(board: chess.Board) -> int:
         mg_score -= BISHOP_PAIR_BONUS_MG
         eg_score -= BISHOP_PAIR_BONUS_EG
 
-    # Mobilidade
-    own = board.turn
-    board.turn = chess.WHITE
-    mobility_w = board.legal_moves.count()
-    board.turn = chess.BLACK
-    mobility_b = board.legal_moves.count()
-    board.turn = own
+    # Mobilidade (reutiliza os valores calculados no topo)
     mg_score += (mobility_w - mobility_b) * MOBILITY_WEIGHT_MG
     eg_score += (mobility_w - mobility_b) * MOBILITY_WEIGHT_EG
 
-    # Estrutura de peões
-    mg_score += _pawn_structure(board)
-    eg_score += _pawn_structure(board)
+    # Estrutura de peões (calculada uma vez; mesmo valor para mg/eg)
+    pawn_score = _pawn_structure(board)
+    mg_score += pawn_score
+    eg_score += pawn_score
 
-    # Segurança do rei
-    mg_score += _king_safety(board)
+    # Segurança do rei (reutiliza a fase já calculada)
+    mg_score += _king_safety(board, phase)
 
     # Torres em fileiras abertas/meiabertas
     for color in (chess.WHITE, chess.BLACK):
@@ -341,9 +438,15 @@ def _pawn_structure(board: chess.Board) -> int:
     """Peças dobradas, isoladas e passadas."""
     score = 0
     file_mask = chess.BB_FILES
+    enemy_pawns = (
+        board.pieces_mask(chess.PAWN, chess.BLACK),
+        board.pieces_mask(chess.PAWN, chess.WHITE),
+    )
     for color in (chess.WHITE, chess.BLACK):
         sign = 1 if color else -1
         pawns = board.pieces(chess.PAWN, color)
+        enemy = enemy_pawns[0 if color else 1]
+        windows = _PASS_WINDOWS[color]
         own_files = set()
         for sq in pawns:
             f = chess.square_file(sq)
@@ -358,21 +461,9 @@ def _pawn_structure(board: chess.Board) -> int:
             )
             if not has_neighbor:
                 score += sign * ISOLATED_PAWN_PENALTY
-            is_pass = True
-            for df in (-1, 0, 1):
-                nf = f + df
-                if 0 <= nf <= 7:
-                    for r in (
-                        range(rank + 1, 8) if color else range(rank)
-                    ):
-                        if board.piece_at(chess.square(nf, r)) == chess.Piece(
-                            chess.PAWN, not color
-                        ):
-                            is_pass = False
-                            break
-                if not is_pass:
-                    break
-            if is_pass:
+            if not (enemy & windows[f][rank]):
+                # Peão passado: nenhum peão inimigo à frente (arquivos
+                # vizinhos) — mesma condição do laço original piece_at.
                 mg_b = PASSED_PAWN_BONUS_MG[rank]
                 eg_b = PASSED_PAWN_BONUS_EG[rank]
                 score += sign * ((mg_b + eg_b) // 2)
@@ -380,7 +471,7 @@ def _pawn_structure(board: chess.Board) -> int:
     return score
 
 
-def _king_safety(board: chess.Board) -> int:
+def _king_safety(board: chess.Board, phase: int) -> int:
     """Segurança do rei baseada no escudo de peões."""
     score = 0
     for color in (chess.WHITE, chess.BLACK):
@@ -390,22 +481,18 @@ def _king_safety(board: chess.Board) -> int:
             continue
         file = chess.square_file(king_sq)
         rank = chess.square_rank(king_sq)
+        own_pawns = board.pieces_mask(chess.PAWN, color)
+        fronts = _SHELTER_FRONT[color]
         shelter = 0
         for df in (-1, 0, 1):
             f = file + df
             if 0 <= f <= 7:
-                front = range(rank + 1, 8) if color else range(rank)
-                found = False
-                for r in front:
-                    if board.piece_at(chess.square(f, r)) == chess.Piece(
-                        chess.PAWN, color
-                    ):
-                        shelter += 1
-                        found = True
-                        break
-                if not found:
+                # Peão próprio à frente naquele arquivo? (máscara
+                # equivalente ao laço piece_at + chess.Piece original)
+                if own_pawns & fronts[f][rank]:
+                    shelter += 1
+                else:
                     shelter -= 1
-        phase = _game_phase(board)
         if phase > 12:
             score += sign * (KING_SAFETY_PENALTY_MG if shelter < 2 else 0)
         else:

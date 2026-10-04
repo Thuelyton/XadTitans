@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import chess
 
-from xadtitans.ai.evaluation import evaluate
+from xadtitans.ai.evaluation import clear_caches, evaluate
 from xadtitans.ai.search import TranspositionTable, iterative_deepening
 
 POSITIONS: list[tuple[str, str]] = [
@@ -47,13 +47,14 @@ def main() -> int:
             )
         print()
 
-    # Avaliação
+    # Avaliação (custo bruto, cache limpa a cada chamada)
     board = chess.Board()
     t0 = time.perf_counter()
     for _ in range(10000):
+        clear_caches()
         evaluate(board)
     eval_time = (time.perf_counter() - t0) / 10000 * 1e6
-    print(f"Avaliação: {eval_time:.1f} us/chamada ({1e6/eval_time:.0f} evals/s)")
+    print(f"Avaliação (sem cache): {eval_time:.1f} us/chamada ({1e6/eval_time:.0f} evals/s)")
 
     return 0
 
