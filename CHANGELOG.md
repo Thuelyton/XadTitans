@@ -122,3 +122,53 @@
   com tempo suficiente, determinismo com seed, equivalência da
   avaliação à baseline). 996 testes passando; Ruff limpo; 10 partidas
   AI vs AI sem lances ilegais nem exceções (4–4, 2 empates).
+
+## [0.6.5] - 2026-10-04
+
+### Fase 6.5 — Profiling de renderização e memória
+
+- Nova ferramenta `tools/profile_render.py` (headless, sem intervenção
+  manual, com diretório de dados isolado): cenários de menu, partida
+  estática/seleção/hover+xeque/animação/fim de partida; FPS e frame
+  time (média, p50, p95, máximo); atribuição de custo por componente
+  do draw; cProfile de uma sessão completa; memória via tracemalloc +
+  RSS; e teste de churn de cenas (criar/sair/recriar GameScene).
+  Limitação documentada: driver de vídeo dummy (sem GPU/vsync) — os
+  custos absolutos de blit diferem de hardware real, mas a atribuição
+  relativa entre componentes é representativa.
+- Baseline no commit `999f77d` (mesma ferramenta/configuração):
+  partida estática 2,91 ms/344 FPS; com seleção 2,88 ms/347 FPS;
+  hover+xeque 2,71 ms/368 FPS; animação 2,87 ms/348 FPS (máx 14,3 ms);
+  fim de partida 6,03 ms/166 FPS (p95 7,5 ms); menu 0,47 ms. Meta de
+  30 FPS (33,3 ms/quadro) atendida em todos os cenários. Sessão
+  cProfile: 0,971 s, com `is_game_over()` → `outcome()` →
+  `can_claim_threefold_repetition` do python-chess respondendo por
+  34% do tempo (0,336 s; ~1,3 ms por chamada; ~1,5 chamadas por
+  quadro durante toda a partida). Memória estável: sessão de 720
+  frames ~0 MB de crescimento; churn de 30 ciclos de GameScene com
+  delta de 0,4 KB/ciclo após o ciclo 5 (sem vazamento).
+- Otimização 1 (comprovada pelo cProfile): cache de fim de partida em
+  `core/game.py` — `is_game_over()` memoizado e invalidado em toda
+  mutação (push/undo/reset/desistência/timeout/empate e substituição
+  do tabuleiro via property). Valor retornado idêntico ao cálculo
+  direto; API pública preservada.
+- Otimização 2 (comprovada por frame time): `EndgameScene` criava o
+  véu escurecido fullscreen (≈3 MB) e re-renderizava os 3 textos do
+  resultado a cada quadro; agora véu e textos são estáticos por cena
+  (véu por tamanho de tela).
+- Depois (back-to-back, mesma ferramenta): partida estática
+  2,20 ms/454 FPS (−24% de frame, +32% de FPS); com seleção
+  2,41 ms/415 FPS (−16%); hover+xeque 2,04 ms/490 FPS (−25%);
+  animação 2,27 ms/440 FPS (−21%; máx 14,3 → 7,5 ms); fim de
+  partida 4,68 ms/214 FPS (−22%). Painel lateral (custo por
+  componente): 1,03 → 0,28 ms por quadro (−74%). Sessão cProfile:
+  0,971 → 0,533 s (−45%); chamadas de função 440 mil → 153 mil.
+- Gargalos restantes (mantidos por não serem relevantes): blits/fill
+  do full-redraw em C (~0,6 ms tabuleiro + ~0,8 ms peças — inerentes
+  à arquitetura de redesenho completo) e ~0,2 ms de `font.render`
+  (~10% do frame de partida, < 1% do orçamento de 33 ms).
+- Memória após as otimizações: inalterada e estável (sessão longa e
+  churn de cenas sem crescimento).
+- Regressão: 996 testes passando; Ruff limpo; 10 partidas AI vs AI
+  sem lances ilegais nem exceções (5–4, 1 empate); `tools/bench_fps.py`
+  com 423 FPS (meta ≥ 30).

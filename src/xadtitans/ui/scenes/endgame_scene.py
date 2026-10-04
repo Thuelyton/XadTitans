@@ -49,6 +49,11 @@ class EndgameScene:
 
         self._font = pygame.font.SysFont("arial", 36, bold=True)
         self._hint_font = pygame.font.SysFont("arial", 18)
+        # Elementos estáticos por cena: véu escurecido (superfície
+        # fullscreen — alocar ~3 MB por frame era o maior custo do
+        # overlay, medido na Fase 6.5) e textos pré-renderizados.
+        self._veil: pygame.Surface | None = None
+        self._texts: tuple[pygame.Surface, ...] | None = None
 
     # ── interface de cena ─────────────────────────────────
 
@@ -77,22 +82,31 @@ class EndgameScene:
         surface.fill(COLOR_BG)
         self.game_scene.board_view.draw(surface)
 
-        # Véu escurecido
-        veil = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        veil.fill((0, 0, 0, 160))
-        surface.blit(veil, (0, 0))
+        # Véu escurecido (estático: criado uma única vez por tamanho
+        # de tela; uma vez por sessão em resolução fixa)
+        size = surface.get_size()
+        if self._veil is None or self._veil.get_size() != size:
+            self._veil = pygame.Surface(size, pygame.SRCALPHA)
+            self._veil.fill((0, 0, 0, 160))
+        surface.blit(self._veil, (0, 0))
 
         # Resultado
         assert self._result is not None
-        text = result_text(self._result)
-        rendered = self._font.render(text, True, (240, 240, 240))
+        # Textos estáticos: pré-renderizados uma única vez por cena
+        if self._texts is None:
+            self._texts = (
+                self._font.render(
+                    result_text(self._result), True, (240, 240, 240)
+                ),
+                self._font.render(t("game.game_over"), True, (255, 215, 0)),
+                self._hint_font.render(
+                    t("hint.endgame"), True, (180, 180, 180)
+                ),
+            )
+        rendered, title, hint = self._texts
         rect = rendered.get_rect(center=(WINDOW_WIDTH // 2, 300))
         surface.blit(rendered, rect)
 
         # Título e dica
-        title = self._font.render(t("game.game_over"), True, (255, 215, 0))
         surface.blit(title, title.get_rect(center=(WINDOW_WIDTH // 2, 240)))
-        hint = self._hint_font.render(
-            t("hint.endgame"), True, (180, 180, 180)
-        )
         surface.blit(hint, hint.get_rect(center=(WINDOW_WIDTH // 2, 350)))

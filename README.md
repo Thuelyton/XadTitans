@@ -205,6 +205,9 @@ xadtitans/
 └── tools/
     ├── gen_board.py            # gera tabuleiro em perspectiva + squares.json
     ├── bench_ai.py             # nós por segundo e tempo por nível
+    ├── bench_fps.py            # FPS médio de renderização headless
+    ├── profile_ai.py           # profiling cProfile da IA (gargalos, NPS)
+    ├── profile_render.py       # profiling de renderização e memória (Fase 6.5)
     └── build_exe.py            # empacotamento
 ```
 
