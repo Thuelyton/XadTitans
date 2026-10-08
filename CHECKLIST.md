@@ -12,7 +12,7 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 | 3 | Visual estilo Chess Titans | ✅ |
 | 4 | Inteligência artificial | ✅ |
 | 5 | Recursos do jogo | ✅ |
-| 6 | Qualidade e desempenho | ⬜ |
+| 6 | Qualidade e desempenho | ✅ |
 | 7 | Empacotamento (.exe) | ⬜ |
 | 8 | Documentação e divulgação | ⬜ |
 | 9 | Futuro (opcional) | ⬜ |
@@ -198,11 +198,11 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 - [x] Verificar uso de memória e ajustar se passar da meta (Fase 6.5)
 - [x] Verificar que não há nenhuma chamada de rede no código (Fase 6.6 — auditoria estática + guarda de socket em runtime: 0 tentativas)
 - [x] Rodar a lista de **testes manuais** (final deste arquivo) (Fase 6.6 — executados via `tools/manual_checks.py`; ver notas por item)
-- [ ] Testar no PC alvo, com o PC fraco em uso normal (**Fase 6.7 — NÃO executado nesta fase**)
+- [x] Testar no PC alvo, com o PC fraco em uso normal (Fase 6.7 — **PASS**: teste manual no PC real executado pelo usuário em 2026-10-08: partida completa jogada; abertura, tabuleiro, movimentos e IA funcionando; sem travamentos, crashes ou problemas durante a partida)
 - [x] Corrigir todos os bugs encontrados (Fase 6.6 — 3 bugs corrigidos: volume órfão, tabuleiro virado, deadlock AI vs AI)
-- [x] Commit da fase (parcial: pendente o commit da Fase 6.6)
+- [x] Commit da fase (6.6: `88c8b5b`; fechamento da Fase 6: commit desta atualização)
 
-**Pronto quando:** testes automáticos e manuais passam, e o jogo é fluido no PC alvo. ⏳ Falta o teste no PC alvo (Fase 6.7).
+**Pronto quando:** testes automáticos e manuais passam, e o jogo é fluido no PC alvo. ✅ **Cumprido** — suíte completa e testes manuais passando; validação real no PC alvo (Fase 6.7) com partida completa sem problemas. **Fase 6 concluída.**
 
 ---
 
@@ -276,11 +276,11 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 - [x] Peça cravada não pode se mover de forma que exponha o rei — cavalo em e4 sem lances legais (headless)
 
 **Interface**
-- [x] Destaques corretos (seleção, lances legais, último lance, xeque) — verificação de estado via cliques reais (selected_square, legal_destinations, last_move, check_square); **visualização de pixels não é possível sem display — pendente na Fase 6.7 (PC alvo)**
+- [x] Destaques corretos (seleção, lances legais, último lance, xeque) — verificação de estado via cliques reais (selected_square, legal_destinations, last_move, check_square); **visualização de pixels não é possível sem display no ambiente de CI; no teste real da Fase 6.7 (PC alvo) a partida completa foi jogada sem problemas visuais observados**
 - [x] Animações não travam o clique seguinte — bloqueio durante animação + clique seguinte aceito após liberar (headless, estado real do animator)
-- [x] Virar o tabuleiro mantém tudo alinhado — 64/64 casas mapeadas pixel↔casa após rotação (estado geométrico; inspeção visual pendente na Fase 6.7)
+- [x] Virar o tabuleiro mantém tudo alinhado — 64/64 casas mapeadas pixel↔casa após rotação (estado geométrico; no teste real da Fase 6.7 a partida completa foi jogada no PC alvo sem problemas observados)
 - [ ] Redimensionar/tela cheia mantém a proporção — **N/A: recurso não implementado** (janela fixa 1024×768, sem flag RESIZABLE e sem handler de fullscreen). Não testável; não é PASS.
-- [x] Sons tocam e o volume 0 silencia tudo — sons disparados nos fluxos (click/move) e volume 0 → mestre 0.0 via settings; **audição real impossível em headless — confirmar no PC alvo (Fase 6.7)**
+- [x] Sons tocam e o volume 0 silencia tudo — sons disparados nos fluxos (click/move) e volume 0 → mestre 0.0 via settings; **audição real impossível em headless; no teste real da Fase 6.7 a partida completa foi jogada no PC alvo sem problemas observados (áudio não foi relatado separadamente pelo usuário)**
 
 **IA**
 - [x] Nos quatro níveis, a IA responde sem congelar a janela — INICIANTE 0,00s / FÁCIL 0,67s / MÉDIO 3,00s / DIFÍCIL 14,89s (limites 0,5/2/5/15s); lances legais; frame máx 82 ms (headless)

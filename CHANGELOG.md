@@ -235,3 +235,19 @@
   regressão dos bugs corrigidos + 1 do deadlock); Ruff limpo.
 - Pendente para a Fase 6.7 (não executado aqui): teste no PC alvo,
   com o PC fraco em uso normal; conferência visual/audível real.
+
+## [0.6.7] - 2026-10-08
+
+### Fase 6.7 — Validação no PC alvo e fechamento da Fase 6
+
+- Teste manual no PC real (executado pelo usuário): partida completa
+  jogada no XadTitans — abertura, tabuleiro, movimentos e IA
+  funcionando; sem travamentos, crashes ou problemas durante a
+  partida. Resultado: PASS.
+- Regressão final antes do fechamento: suíte completa passando,
+  Ruff limpo, `git diff --check` sem erros.
+- Fase 6 (Qualidade e desempenho) oficialmente concluída. Itens
+  ainda pendentes de validação em ambiente real (áudio audível,
+  PGN em programa de xadrez de terceiros) seguem documentados no
+  CHECKLIST como limitações do ambiente de CI; o jogo em uso real
+  foi validado no PC alvo.
