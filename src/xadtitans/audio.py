@@ -57,6 +57,22 @@ class AudioManager:
         sound.set_volume(rel * self._master)
         sound.play()
 
+    @property
+    def volume(self) -> float:
+        """Volume geral (0.0–1.0); espelha o volume mestre.
+
+        As telas de configuração e o ``App`` ajustam o volume via
+        ``audio.volume = x`` — este property garante que o valor
+        chegue ao ``_master`` realmente usado por ``play()`` (antes
+        era um atributo órfão: a configuração não silenciava nada).
+        """
+        return self._master
+
+    @volume.setter
+    def volume(self, value: float) -> None:
+        """Define o volume geral (0.0–1.0, com clamp); 0 silencia."""
+        self.set_master_volume(value)
+
     def set_master_volume(self, value: float) -> None:
         """Volume geral 0.0–1.0 (0 silencia tudo)."""
         self._master = max(0.0, min(1.0, value))

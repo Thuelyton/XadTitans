@@ -301,8 +301,17 @@ class BoardView:
         return cx + BOARD_PERSP_X, cy + BOARD_PERSP_Y
 
     def _cell_w(self, sq: int) -> float:
+        """Largura média da casa (módulo).
+
+        Com o mapa flipped (rotação 180°) a fórmula de arestas inverte
+        o sinal; a largura é uma magnitude — sem ``abs`` o raio dos
+        pontos/aneis de lances legais ficava negativo e o pygame
+        derrubava a busca com "Invalid resolution for Surface".
+        """
         poly = self._map.polygon(sq)
-        return (poly[1][0] - poly[0][0] + poly[2][0] - poly[3][0]) / 2.0
+        return abs(
+            (poly[1][0] - poly[0][0] + poly[2][0] - poly[3][0]) / 2.0
+        )
 
     def _draw_last_move(self, surface: pygame.Surface) -> None:
         if self.last_move is not None:
@@ -350,11 +359,18 @@ class BoardView:
     # ── peças ────────────────────────────────────────────
 
     def _foot(self, sq: int) -> tuple[float, float]:
-        """Ponto de apoio da peça: centro da casa + leve offset p/ baixo."""
+        """Ponto de apoio da peça: centro da casa + leve offset p/ baixo.
+
+        O lado "perto" (maior y na tela) é determinado por comparação:
+        com o tabuleiro virado (rotação 180°) a ordem dos cantos do
+        polígono inverte, e assumir a ordem fixa deslocava as peças
+        para cima no mapa flipped.
+        """
         cx, cy = self._center(sq)
         poly = self._map.polygon(sq)
-        near_y = (poly[0][1] + poly[1][1]) / 2.0
-        far_y = (poly[2][1] + poly[3][1]) / 2.0
+        y01 = (poly[0][1] + poly[1][1]) / 2.0
+        y23 = (poly[2][1] + poly[3][1]) / 2.0
+        near_y, far_y = (y01, y23) if y01 >= y23 else (y23, y01)
         return cx, cy + (near_y - far_y) * 0.16
 
     def piece_anchor(self, sq: int) -> tuple[float, float]:

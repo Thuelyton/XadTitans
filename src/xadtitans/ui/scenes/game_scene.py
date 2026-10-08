@@ -557,7 +557,14 @@ class GameScene:
                 and not self.game.is_game_over()
                 and self._is_ai_turn
             ):
-                self._ai_vs_ai_timer = self.ai_vs_ai_delay
+                if self.ai_vs_ai_delay > 0.0:
+                    self._ai_vs_ai_timer = self.ai_vs_ai_delay
+                else:
+                    # Sem intervalo visual: iniciar a próxima busca já.
+                    # (com timer=0.0, ``_update_ai_vs_ai_timer`` retorna
+                    # cedo em ``timer <= 0.0`` e a IA nunca recomeçava —
+                    # deadlock após o 1º lance do modo AI_VS_AI)
+                    self._start_ai()
 
     def _update_ai_vs_ai_timer(self, dt: float) -> None:
         """Decrementa o timer do modo AI_VS_AI e inicia a próxima IA."""

@@ -502,6 +502,27 @@ class TestPollApplyMove:
         # Worker foi limpo (poll processou o resultado).
         assert scene._ai_worker is None
 
+    def test_aia_delay_zero_inicia_proxima_ia(self) -> None:
+        """Regressão Fase 6.6: com ``ai_vs_ai_delay=0.0`` o timer ficava
+        em 0.0 e ``_update_ai_vs_ai_timer`` retornava cedo — a IA
+        seguinte nunca era iniciada e a partida travava após o 1º lance
+        (10/10 timeouts no smoke AI vs AI).
+
+        Com delay 0 a próxima busca deve começar imediatamente após o
+        lance da IA anterior.
+        """
+        scene = _make_scene(GameMode.AI_VS_AI)
+        scene.ai_vs_ai_delay = 0.0
+        scene._cancel_ai()
+        scene._ai_worker = self._make_ready_worker(chess.Move(chess.E2, chess.E4))
+
+        with patch.object(scene, "_start_ai") as mock_start:
+            scene._poll_ai()
+            # Lance aplicado e próxima IA iniciada SEM depender do timer.
+            assert len(scene.game.board.move_stack) == 1
+            mock_start.assert_called_once()
+            assert scene._ai_vs_ai_timer == 0.0  # nenhum timer pendente
+
 
 # ════════════════════════════════════════════════════════════
 # draw e handle_event não crasham

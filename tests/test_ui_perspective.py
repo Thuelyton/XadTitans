@@ -68,6 +68,52 @@ class TestBoardViewPerspectiva:
         bv.toggle_flip()
         assert not bv.flipped
 
+    def test_cell_w_positivo_nas_duas_orientacoes(self) -> None:
+        """Regressão Fase 6.6: com o mapa flipped a fórmula de arestas
+        invertia o sinal e ``_draw_legal`` tentava criar ``Surface``
+        com resolução negativa (pygame.error: Invalid resolution),
+        derrubando o App ao selecionar peça com o tabuleiro virado."""
+        _screen()
+        bv = BoardView()
+        for sq in chess.SQUARES:
+            assert bv._cell_w(sq) > 0, f"base: largura <= 0 em {sq}"
+        bv.toggle_flip()
+        for sq in chess.SQUARES:
+            assert bv._cell_w(sq) > 0, f"flipped: largura <= 0 em {sq}"
+
+    def test_foot_offset_sempre_para_baixo(self) -> None:
+        """O ponto de apoio da peça fica abaixo do centro nas duas
+        orientações (com o mapa flipped, poly[0,1] deixa de ser o lado
+        perto; sem a correção as peças eram deslocadas para cima)."""
+        _screen()
+        bv = BoardView()
+        for _ in range(2):
+            for sq in chess.SQUARES:
+                _cx, cy = bv._center(sq)
+                _fx, fy = bv._foot(sq)
+                assert fy >= cy, (
+                    f"offset para cima em {sq} (flipped={bv.flipped})"
+                )
+            bv.toggle_flip()
+
+    def test_desenho_de_lances_legais_com_tabuleiro_virado(self) -> None:
+        """Regressão do crash: selecionar peça com o tabuleiro virado
+        desenha pontos/aneis de lances legais sem lançar pygame.error."""
+        surf = _screen()
+        scene = GameScene()
+        scene._apply_move(chess.Move.from_uci("e2e4"))
+        _finish_animations(scene)
+        assert scene.board_view.flipped, "HvH deveria virar após e4"
+        # Seleciona o peão preto e7 pelos cliques reais
+        _click(scene, chess.E7)
+        assert scene.board_view.selected_square == chess.E7
+        assert chess.E5 in scene.board_view.legal_destinations
+        scene.draw(surf)  # desenha os pontos/aneis — não pode lançar
+        scene.draw(surf)
+        # Liga também o anel de captura (seleciona casa com peça inimiga)
+        scene.board_view.legal_destinations = [chess.D5]
+        scene.draw(surf)
+
     def test_desenha_sem_erro_com_estado(self) -> None:
         surf = _screen()
         bv = BoardView()

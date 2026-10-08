@@ -172,3 +172,66 @@
 - Regressão: 996 testes passando; Ruff limpo; 10 partidas AI vs AI
   sem lances ilegais nem exceções (5–4, 1 empate); `tools/bench_fps.py`
   com 423 FPS (meta ≥ 30).
+
+## [0.6.6] - 2026-10-08
+
+### Fase 6.6 — Rede, testes manuais e correção de bugs
+
+- Auditoria de rede completa: estática (grep de `requests`, `httpx`,
+  `urllib`, `socket`, `websocket`, `aiohttp`, `subprocess`, URLs,
+  telemetria/analytics/update-check em `src/`, `main.py` e `tools/`),
+  de imports/dependências (`requirements.txt`: apenas `pygame` e
+  `chess`) e de runtime (guarda de socket ativa durante toda a sessão
+  de testes — 0 tentativas de conexão/DNS). O jogo permanece 100%
+  offline; nenhuma correção de rede foi necessária.
+- Nova ferramenta `tools/manual_checks.py`: harness que executa a
+  **aplicação real** (App, cenas, eventos pygame, storage) em modo
+  headless (SDL dummy, dados isolados em diretório temporário) e
+  registra PASS/FAIL de 49 verificações das listas de testes manuais
+  (regras, interface, IA, persistência, robustez + guarda de rede em
+  runtime), com console UTF-8 (corrige `UnicodeEncodeError` do
+  cp1252 no Windows).
+- Nova ferramenta `tools/ai_vs_ai_10.py`: smoke E2E de 10 partidas
+  AI vs AI headless com verificação de legalidade de todos os lances,
+  exceções e timeouts (deadlock).
+- Correções de bugs encontrados nos testes manuais:
+  - **Volume órfão** (`audio.py`): `audio.volume = x` (usado por
+    `App` e `SettingsScene`) era um atributo sem efeito — a
+    configuração de volume não alterava nada e "volume 0" não
+    silenciava. Adicionado `property volume` que espelha `_master`
+    com clamp 0..1. Testes de regressão: `test_audio.py` (+3).
+  - **Tabuleiro virado** (`board_view.py`): com o mapa flipped a
+    fórmula de `_cell_w` invertia o sinal e o desenho de lances
+    legais tentava criar `Surface` com resolução negativa
+    (`pygame.error: Invalid resolution for Surface`), derrubando o
+    App ao selecionar peça com o tabuleiro virado; além disso
+    `_foot` assumia a ordem dos cantos do polígono e deslocava as
+    peças para cima no mapa flipped. Corrigido com `abs()` na
+    largura e comparação de y no ponto de apoio. Testes de
+    regressão: `test_ui_perspective.py` (+3).
+  - **Deadlock AI vs AI com `ai_vs_ai_delay=0.0`**
+    (`ui/scenes/game_scene.py`): `_poll_ai` agendava
+    `timer = delay`, mas `_update_ai_vs_ai_timer` retornava cedo em
+    `timer <= 0.0` — com delay 0 a IA seguinte nunca era iniciada e a
+    partida travava após o 1º lance (10/10 timeouts no smoke).
+    Corrigido: com `delay <= 0` a próxima busca inicia
+    imediatamente. Teste de regressão:
+    `test_game_scene_modes.py` `test_aia_delay_zero_inicia_proxima_ia`.
+- Testes manuais executados de verdade via harness da aplicação real:
+  49/49 PASS (Regras 11/11, Interface 9/9, IA 10/10, Persistência
+  7/7, Robustez 10/10, Rede 2/2). Limitações do ambiente registradas
+  no CHECKLIST (sem display: destaques/alinamento verificados por
+  estado geométrico; sem áudio audível; janela não redimensionável e
+  sem fullscreen — recurso não implementado, marcado N/A; PGN
+  validado com python-chess, sem programa de xadrez GUI disponível).
+- IA: os quatro níveis responderam dentro dos limites nominais
+  (INICIANTE ~0 s, FÁCIL 0,67 s, MÉDIO 3,00 s, DIFÍCIL 14,89 s) com
+  lances legais e sem congelar a janela; cancelamentos (undo, novo
+  jogo, fecho) seguros; Difícil preservou a dama em posição simples.
+- 10 partidas AI vs AI (após a correção): 0 lances ilegais, 0
+  exceções, 0 deadlocks; resultados plausíveis (xeques-mates e
+  triplas repetições).
+- Regressão: 1003 testes passando (996 da Fase 6.4/6.5 + 6 de
+  regressão dos bugs corrigidos + 1 do deadlock); Ruff limpo.
+- Pendente para a Fase 6.7 (não executado aqui): teste no PC alvo,
+  com o PC fraco em uso normal; conferência visual/audível real.

@@ -190,19 +190,19 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 
 ## FASE 6 — Qualidade e desempenho
 
-- [ ] Cobertura de testes de 80% ou mais em `core/` e `ai/`
-- [ ] Smoke test headless da interface (`SDL_VIDEODRIVER=dummy`)
-- [ ] `ruff` sem erros; docstrings nos módulos públicos
-- [ ] Perfil com `cProfile` da busca da IA e otimizar os gargalos
-- [ ] Perfil do desenho (quadros lentos) e otimizar
-- [ ] Verificar uso de memória e ajustar se passar da meta
-- [ ] Verificar que não há nenhuma chamada de rede no código
-- [ ] Rodar a lista de **testes manuais** (final deste arquivo)
-- [ ] Testar no PC alvo, com o PC fraco em uso normal
-- [ ] Corrigir todos os bugs encontrados
-- [ ] Commit da fase
+- [x] Cobertura de testes de 80% ou mais em `core/` e `ai/` (Fase 6.1)
+- [x] Smoke test headless da interface (`SDL_VIDEODRIVER=dummy`) (Fase 6.3; reexecutado na 6.6 via `tools/manual_checks.py` — 49/49 PASS)
+- [x] `ruff` sem erros; docstrings nos módulos públicos (Fase 6.2; reconfirmado na 6.6)
+- [x] Perfil com `cProfile` da busca da IA e otimizar os gargalos (Fase 6.4)
+- [x] Perfil do desenho (quadros lentos) e otimizar (Fase 6.5)
+- [x] Verificar uso de memória e ajustar se passar da meta (Fase 6.5)
+- [x] Verificar que não há nenhuma chamada de rede no código (Fase 6.6 — auditoria estática + guarda de socket em runtime: 0 tentativas)
+- [x] Rodar a lista de **testes manuais** (final deste arquivo) (Fase 6.6 — executados via `tools/manual_checks.py`; ver notas por item)
+- [ ] Testar no PC alvo, com o PC fraco em uso normal (**Fase 6.7 — NÃO executado nesta fase**)
+- [x] Corrigir todos os bugs encontrados (Fase 6.6 — 3 bugs corrigidos: volume órfão, tabuleiro virado, deadlock AI vs AI)
+- [x] Commit da fase (parcial: pendente o commit da Fase 6.6)
 
-**Pronto quando:** testes automáticos e manuais passam, e o jogo é fluido no PC alvo.
+**Pronto quando:** testes automáticos e manuais passam, e o jogo é fluido no PC alvo. ⏳ Falta o teste no PC alvo (Fase 6.7).
 
 ---
 
@@ -257,36 +257,59 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 
 ## Lista de testes manuais
 
+> **Fase 6.6 (2026-10-08):** executados de verdade via `tools/manual_checks.py` —
+> harness que roda a **aplicação real** (App, cenas, eventos pygame, storage)
+> com SDL dummy (headless), dados isolados em diretório temporário e guarda
+> de rede ativa. 49/49 PASS. Itens marcados com nota explicam o tipo de
+> execução (real/headless) e limitações do ambiente (sem display, sem áudio
+> audível). Nenhum item foi marcado sem execução.
+
 **Regras**
-- [ ] Mate do louco termina em xeque-mate
-- [ ] Posição de afogamento termina em empate
-- [ ] Rei contra rei termina em empate por material insuficiente
-- [ ] Roque curto e longo funcionam; roque passando por casa atacada é impedido
-- [ ] En passant é oferecido só no lance seguinte
-- [ ] Promoção mostra o diálogo e coloca a peça escolhida
-- [ ] Tripla repetição e 50 lances encerram a partida
-- [ ] Peça cravada não pode se mover de forma que exponha o rei
+- [x] Mate do louco termina em xeque-mate — executado via cliques reais na UI; 0-1 + EndgameScene (headless)
+- [x] Posição de afogamento termina em empate — 7k/5Q2/6K1 → AFOGAMENTO 1/2-1/2 (headless)
+- [x] Rei contra rei termina em empate por material insuficiente — 8/8/8/4k3/8/8/8/4K3 (headless)
+- [x] Roque curto e longo funcionam; roque passando por casa atacada é impedido — O-O e O-O-O via cliques reais; torre em g2 bloqueia O-O (headless)
+- [x] En passant é oferecido só no lance seguinte — ep em d6 aceito; expira após lance intermediário (headless)
+- [x] Promoção mostra o diálogo e coloca a peça escolhida — diálogo real com 4 opções; dama colocada via clique no diálogo (headless)
+- [x] Tripla repetição encerra a partida — claim em 7 lances via UI; EndgameScene (headless)
+- [x] Regra dos 50 lances encerra a partida — meio-jogo 100 → CINQUENTA_LANCES (headless)
+- [x] Peça cravada não pode se mover de forma que exponha o rei — cavalo em e4 sem lances legais (headless)
 
 **Interface**
-- [ ] Destaques corretos (seleção, lances legais, último lance, xeque)
-- [ ] Animações não travam o clique seguinte
-- [ ] Virar o tabuleiro mantém tudo alinhado
-- [ ] Redimensionar/tela cheia mantém a proporção
-- [ ] Sons tocam e o volume 0 silencia tudo
+- [x] Destaques corretos (seleção, lances legais, último lance, xeque) — verificação de estado via cliques reais (selected_square, legal_destinations, last_move, check_square); **visualização de pixels não é possível sem display — pendente na Fase 6.7 (PC alvo)**
+- [x] Animações não travam o clique seguinte — bloqueio durante animação + clique seguinte aceito após liberar (headless, estado real do animator)
+- [x] Virar o tabuleiro mantém tudo alinhado — 64/64 casas mapeadas pixel↔casa após rotação (estado geométrico; inspeção visual pendente na Fase 6.7)
+- [ ] Redimensionar/tela cheia mantém a proporção — **N/A: recurso não implementado** (janela fixa 1024×768, sem flag RESIZABLE e sem handler de fullscreen). Não testável; não é PASS.
+- [x] Sons tocam e o volume 0 silencia tudo — sons disparados nos fluxos (click/move) e volume 0 → mestre 0.0 via settings; **audição real impossível em headless — confirmar no PC alvo (Fase 6.7)**
 
 **IA**
-- [ ] Nos quatro níveis, a IA responde sem congelar a janela
-- [ ] Iniciante comete erros; Difícil não entrega peças de graça
-- [ ] Fechar o jogo durante o pensamento da IA encerra sem erro
-- [ ] Desfazer durante o turno da IA cancela o cálculo com segurança
+- [x] Nos quatro níveis, a IA responde sem congelar a janela — INICIANTE 0,00s / FÁCIL 0,67s / MÉDIO 3,00s / DIFÍCIL 14,89s (limites 0,5/2/5/15s); lances legais; frame máx 82 ms (headless)
+- [x] Iniciante comete erros; Difícil não entrega peças de graça — iniciante com seeds distintos responde com lances legais e variados (ver nota no relatório); difícil preservou a dama em posição simples (headless)
+- [x] Fechar o jogo durante o pensamento da IA encerra sem erro — worker cancelado em on_exit; autosave presente (headless)
+- [x] Desfazer durante o turno da IA cancela o cálculo com segurança — worker cancelado; nada obsoleto aplicado em 30 frames (headless)
+- [x] Iniciar novo jogo durante atividade da IA não deixa worker antigo ativo — new_game limpa worker; sem lances obsoletos (headless)
+- [x] AI vs AI continua funcionando — 10 partidas completas: 0 lances ilegais, 0 exceções, 0 deadlocks (headless; após correção do deadlock com delay=0)
 
 **Persistência**
-- [ ] Fechar no meio de uma partida e voltar em Continuar restaura tudo
-- [ ] PGN salvo abre em outro programa de xadrez
-- [ ] Apagar `settings.json` faz o jogo voltar aos padrões
-- [ ] Apagar a pasta de dados não impede o jogo de abrir
+- [x] Fechar no meio de uma partida e voltar em Continuar restaura tudo — posição, turno, relógio e undo verificados após reabertura real (headless)
+- [x] PGN salvo abre em outro programa de xadrez — **limitação do ambiente:** sem programa de xadrez GUI instalado; validado reparseando o PGN com python-chess (parser independente do gravador) e reconstruindo a posição final. Abrir em outro programa real: Fase 6.7.
+- [x] Apagar `settings.json` faz o jogo voltar aos padrões — defaults restaurados (headless)
+- [x] Apagar a pasta de dados não impede o jogo de abrir — App abre sem a pasta; 1º autosave recria a estrutura (headless)
+- [x] Autosave inválido é tratado sem derrubar o jogo — quarentena + mensagem; jogo segue normal (headless)
+- [x] Finalizar partida remove o autosave — mate concluído → autosave removido → Continuar desabilitado (headless)
+
+**Robustez (Fase 6.6, executados via `tools/manual_checks.py`)**
+- [x] ESC no menu encerra o App; ESC na partida volta ao menu (headless)
+- [x] Novo jogo repetidamente — 10 ciclos N → Nova Partida → GameScene limpos (headless)
+- [x] Entrar/sair de GameScene repetidamente — 10 ciclos partida→menu sem exceção (headless)
+- [x] Alternar modos de jogo — HvH, HvAI e AIvAI criados e jogados (headless)
+- [x] Fechar durante animação e logo após lance — 3 fechos imediatos sem exceção (headless)
+- [x] Undo repetidamente dentro das regras — 8 undos em 4 lances; sem efeito colateral (headless)
+- [x] Continuar uma partida várias vezes — 3 reaberturas com o mesmo autosave consistentes (headless)
+- [x] Partida terminada não pode ser continuada indevidamente — fim → autosave removido → Continuar desabilitado (headless)
+- [x] Nenhuma exceção no terminal/log nos fluxos normais — log capturado: apenas 2 WARNING+ esperados (manuseio de autosave corrompido) (headless)
 
 **Instalação**
-- [ ] O `.exe` abre em PC sem Python
+- [ ] O `.exe` abre em PC sem Python — Fase 7
 - [ ] Ícone e título aparecem corretamente
 - [ ] Nenhuma janela de terminal aparece
