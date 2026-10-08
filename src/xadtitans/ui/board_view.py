@@ -126,24 +126,40 @@ def _load_image(path) -> pygame.Surface:
         return surf
 
 
+def _load_board_image(filename: str) -> pygame.Surface:
+    """Carrega uma imagem de tabuleiro e ajusta ao tamanho de config."""
+    img = _load_image(resource_path("assets/board") / filename)
+    if img.get_size() != (BOARD_IMG_W, BOARD_IMG_H):
+        img = pygame.transform.smoothscale(img, (BOARD_IMG_W, BOARD_IMG_H))
+    return img
+
+
 class BoardView:
     """Desenha o tabuleiro em perspectiva, peças e destaques."""
 
     def __init__(self) -> None:
-        """Carrega o mapa de casas e as imagens do tabuleiro e das peças."""
+        """Carrega os dois pares (mapa, imagem) e inicia na visão branca.
+
+        Orientação é uma única fonte de verdade: ``self.flipped``
+        escolhe qual par (mapa de casas + imagem com coordenadas
+        gravadas) está ativo. Peças, destaques, clique→casa e
+        coordenadas visuais derivam todos do par ativo — não há
+        nenhuma condição "se pretas" espalhada no renderer.
+        """
         self.flipped = False
 
-        base_map = BoardMap.load(resource_path("assets/board/squares.json"))
-        self._base_map = base_map
-        self._map = base_map
-
-        self._board_img = _load_image(
-            resource_path("assets/board/board_perspective.png")
+        white_map = BoardMap.load(resource_path("assets/board/squares.json"))
+        black_map = BoardMap.load(
+            resource_path("assets/board/squares_black.json")
         )
-        if self._board_img.get_size() != (BOARD_IMG_W, BOARD_IMG_H):
-            self._board_img = pygame.transform.smoothscale(
-                self._board_img, (BOARD_IMG_W, BOARD_IMG_H)
-            )
+        self._maps = {False: white_map, True: black_map}
+        self._base_map = white_map
+        self._map = white_map
+
+        white_img = _load_board_image("board_perspective.png")
+        black_img = _load_board_image("board_perspective_black.png")
+        self._board_imgs = {False: white_img, True: black_img}
+        self._board_img = white_img
 
         # Largura da casa mais próxima (referência de escala das peças)
         a1 = self._base_map.polygon(chess.A1)
@@ -236,9 +252,16 @@ class BoardView:
         self.legal_destinations = []
 
     def toggle_flip(self) -> None:
-        """Inverte a orientação do tabuleiro (rotação de 180°)."""
+        """Alterna a orientação do tabuleiro.
+
+        Único ponto de troca: mapa de casas + imagem do tabuleiro
+        (coordenadas gravadas) são trocados juntos, garantindo que
+        ``casa → tela``, ``tela → casa`` e as coordenadas visuais
+        usem sempre a mesma transformação.
+        """
         self.flipped = not self.flipped
-        self._map = self._base_map.flipped() if self.flipped else self._base_map
+        self._map = self._maps[self.flipped]
+        self._board_img = self._board_imgs[self.flipped]
 
     def square_at(self, px: float, py: float) -> int | None:
         """Casa sob o pixel da TELA (não da imagem do tabuleiro)."""

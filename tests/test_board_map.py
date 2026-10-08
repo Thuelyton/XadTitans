@@ -22,8 +22,9 @@ def board_map() -> BoardMap:
 
 
 @pytest.fixture(scope="module")
-def flipped(board_map: BoardMap) -> BoardMap:
-    return board_map.flipped()
+def black_map() -> BoardMap:
+    """Mapa da visão das pretas (asset gerado para a própria câmera)."""
+    return BoardMap.load(ASSET / "squares_black.json")
 
 
 class TestCarregamento:
@@ -79,10 +80,10 @@ class TestConversao:
 
     @pytest.mark.parametrize("sq", range(64))
     def test_centro_retorna_a_propria_casa_virado(
-        self, flipped: BoardMap, sq: int
+        self, black_map: BoardMap, sq: int
     ) -> None:
-        cx, cy = flipped.center(sq)
-        assert flipped.square_at(cx, cy) == sq
+        cx, cy = black_map.center(sq)
+        assert black_map.square_at(cx, cy) == sq
 
     def test_fora_do_tabuleiro(self, board_map: BoardMap) -> None:
         assert board_map.square_at(-5, -5) is None
@@ -90,20 +91,64 @@ class TestConversao:
         # canto superior esquerdo da imagem (moldura, fora do campo)
         assert board_map.square_at(30, 60) is None
 
-    def test_flip_e_rotacao_180(self, board_map: BoardMap) -> None:
-        """Virado, cada casa ocupa a própria posição rotacionada
-        (a1, canto de baixo-esquerda, vai ao topo-direita)."""
-        flipped = board_map.flipped()
-        w, h = board_map.width, board_map.height
-        ax, ay = board_map.center(chess.A1)
-        fx, fy = flipped.center(chess.A1)
-        assert fx == pytest.approx(w - ax)
-        assert fy == pytest.approx(h - ay)
 
-    def test_flip_preserva_escala(self, board_map: BoardMap) -> None:
-        flipped = board_map.flipped()
+class TestCantosPorPerspectiva:
+    """Critérios de aceitação da orientação (Fase 6.7/bug de flip).
+
+    BRANCAS: a1 inferior-esquerda, h1 inferior-direita,
+             a8 superior-esquerda, h8 superior-direita.
+    PRETAS:  h8 inferior-esquerda, a8 inferior-direita,
+             h1 superior-esquerda, a1 superior-direita.
+
+    Cada visão usa o mapa gerado para a própria câmera.
+    """
+
+    @staticmethod
+    def _quadrantes(m: BoardMap) -> dict[int, str]:
+        """House → quadrante ("ES|EI|DS|DI") relativo ao centro do campo."""
+        xs = [m.center(sq)[0] for sq in range(64)]
+        ys = [m.center(sq)[1] for sq in range(64)]
+        xmid = (min(xs) + max(xs)) / 2
+        ymid = (min(ys) + max(ys)) / 2
+        out = {}
         for sq in range(64):
-            assert flipped.scale(sq) == board_map.scale(sq)
+            cx, cy = m.center(sq)
+            out[sq] = ("E" if cx < xmid else "D") + (
+                "S" if cy < ymid else "I"
+            )
+        return out
+
+    def test_brancas_cantos(self, board_map: BoardMap) -> None:
+        q = self._quadrantes(board_map)
+        assert q[chess.A1] == "EI", "brancas: a1 deve ficar em baixo-esquerda"
+        assert q[chess.H1] == "DI", "brancas: h1 deve ficar em baixo-direita"
+        assert q[chess.A8] == "ES", "brancas: a8 deve ficar em cima-esquerda"
+        assert q[chess.H8] == "DS", "brancas: h8 deve ficar em cima-direita"
+
+    def test_pretas_cantos(self, black_map: BoardMap) -> None:
+        q = self._quadrantes(black_map)
+        assert q[chess.H8] == "EI", "pretas: h8 deve ficar em baixo-esquerda"
+        assert q[chess.A8] == "DI", "pretas: a8 deve ficar em baixo-direita"
+        assert q[chess.H1] == "ES", "pretas: h1 deve ficar em cima-esquerda"
+        assert q[chess.A1] == "DS", "pretas: a1 deve ficar em cima-direita"
+
+    def test_pretas_perspectiva_legitima(
+        self, board_map: BoardMap, black_map: BoardMap
+    ) -> None:
+        """Visão preta é re-projeção (rank 8 perto), não rotação da imagem.
+
+        Rank 8 deve ter a maior escala (casa larga, perto da câmera) e
+        rank 1 a menor — o inverso exato das brancas. Uma simples
+        rotação 180° dos polígonos manteria as escalas trocadas (bug
+        de escala invertida corrigido nesta fase).
+        """
+        white_scales = [board_map.scale(r * 8) for r in range(8)]
+        black_scales = [black_map.scale(r * 8) for r in range(8)]
+        assert black_scales == list(reversed(white_scales))
+        assert black_scales[7] == pytest.approx(1.0)  # rank 8 = perto
+        assert black_scales[0] < 0.8                   # rank 1 = longe
+        # E a imagem preta difere da branca (re-projeção própria):
+        assert board_map.polygon(chess.A1) != black_map.polygon(chess.A1)
 
 
 class TestPontoEmPoligono:

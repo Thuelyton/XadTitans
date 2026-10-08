@@ -1,8 +1,8 @@
-"""Gera o tabuleiro em perspectiva (estilo Chess Titans).
+"""Gera o tabuleiro em perspectiva (estilo Chess Titans) — duas visões.
 
 Saídas (em assets/board/):
-  - board_perspective.png : tabuleiro + moldura de madeira
-  - squares.json          : polígono, centro e escala de cada casa
+  - board_perspective.png / squares.json         : visão das brancas
+  - board_perspective_black.png / squares_black.json : visão das pretas
 
 A projeção é de câmera pinhole real (câmera atrás da borda das brancas,
 eixo paralelo ao chão): um ponto do plano do tabuleiro (x_b, z_b) vai para
@@ -13,6 +13,13 @@ eixo paralelo ao chão): um ponto do plano do tabuleiro (x_b, z_b) vai para
 
 O campo de jogo é x_b ∈ [-4, 4] (a→h), z_b ∈ [0, 8] (1→8);
 a moldura é o mesmo plano estendido (x ±4.6, z -0.6..8.6).
+
+**Convenção central de orientação:** a visão das pretas é a MESMA câmera
+com o tabuleiro rotacionado 180° no espaço do mundo (x_b → -x_b,
+z_b → 8 - z_b) — uma re-projeção real, não uma rotação da imagem. Assim
+rank 8 fica perto (casas largas) e as coordenadas gravadas na moldura
+saem h→a e 8→1 corretamente para as pretas. Cada casa mantém sua
+identidade de quadrado de xadrez (`square`) nas duas visões.
 
 Uso:
     .venv/Scripts/python.exe tools/gen_board.py
@@ -93,8 +100,16 @@ def _masked_overlay(img: Image.Image, overlay: Image.Image, mask: Image.Image) -
     img.alpha_composite(overlay)
 
 
-def generate(out_dir: Path, width: int, height: int) -> tuple[Path, Path]:
-    """Gera PNG + JSON; retorna os caminhos."""
+def generate(
+    out_dir: Path, width: int, height: int, side: str = "white"
+) -> tuple[Path, Path]:
+    """Gera PNG + JSON da visão *side* ("white" ou "black"); retorna os caminhos.
+
+    A imagem/moldura são idênticas nas duas visões (câmera igual); mudam
+    apenas a re-projeção das casas (tabuleiro rotacionado 180° no mundo
+    para "black"), a escala relativa e o texto das coordenadas gravado.
+    """
+    assert side in ("white", "black"), side
     out_dir.mkdir(parents=True, exist_ok=True)
 
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
@@ -140,10 +155,16 @@ def generate(out_dir: Path, width: int, height: int) -> tuple[Path, Path]:
     # ── casas do campo de jogo ─────────────────────────
     squares: list[dict] = []
     raw_w: list[float] = []
-    for r in range(8):        # rank 1..8 (z = r .. r+1)
-        for f in range(8):    # file a..h (x = -4+f .. -4+f+1)
-            x0, x1 = -4.0 + f, -4.0 + f + 1
-            z0, z1 = float(r), float(r + 1)
+    for r in range(8):        # rank 1..8 (câmara: z = r .. r+1)
+        for f in range(8):    # file a..h
+            if side == "white":
+                x0, x1 = -4.0 + f, -4.0 + f + 1
+                z0, z1 = float(r), float(r + 1)
+            else:
+                # Re-projeção: tabuleiro rotacionado 180° no espaço do
+                # mundo (x→-x, z→8-z); a câmera permanece a mesma.
+                x0, x1 = 3.0 - f, 4.0 - f
+                z0, z1 = 7.0 - r, 8.0 - r
             quad = _quad(x0, x1, z0, z1)
             base = _CELL_LIGHT if (f + r) % 2 else _CELL_DARK
             d.polygon(quad, fill=_depth_shade(base, (z0 + z1) / 2))
@@ -162,8 +183,8 @@ def generate(out_dir: Path, width: int, height: int) -> tuple[Path, Path]:
                 }
             )
 
-    # Escala relativa à fileira 1 (a mais próxima = 1.0)
-    ref_w = raw_w[0]
+    # Escala relativa à fileira mais perto da câmera (= 1.0)
+    ref_w = max(raw_w)
     for sq, w in zip(squares, raw_w, strict=True):
         sq["scale"] = round(w / ref_w, 4)
 
@@ -185,27 +206,31 @@ def generate(out_dir: Path, width: int, height: int) -> tuple[Path, Path]:
     )
 
     # ── coordenadas gravadas na moldura ────────────────
+    # Posições no espaço da CÂMERA; a visão preta re-rotaciona o rótulo
+    # (files h→a e ranks 8→1 no lado esquerdo/inferior), mantendo a
+    # identidade de cada casa.
     font = _load_font(20)
     for f, letter in enumerate("abcdefgh"):
-        x_b = -4.0 + f + 0.5
+        x_b = -4.0 + f + 0.5 if side == "white" else 3.5 - f
         px, py = _project(x_b, -0.32)
         d.text(
             (px, py), letter, font=font, fill=(60, 38, 20, 200),
             anchor="mm",
         )
     for r in range(8):
-        z_b = r + 0.5
+        z_b = r + 0.5 if side == "white" else 7.5 - r
         px, py = _project(-4.31, z_b)
         d.text(
             (px, py), str(r + 1), font=font, fill=(60, 38, 20, 200),
             anchor="mm",
         )
 
-    png_path = out_dir / "board_perspective.png"
+    stem = "board_perspective" if side == "white" else "board_perspective_black"
+    png_path = out_dir / f"{stem}.png"
     img.save(png_path)
 
     data = {
-        "image": "board_perspective.png",
+        "image": f"{stem}.png",
         "width": width,
         "height": height,
         "projection": {
@@ -213,7 +238,9 @@ def generate(out_dir: Path, width: int, height: int) -> tuple[Path, Path]:
         },
         "squares": squares,
     }
-    json_path = out_dir / "squares.json"
+    json_path = out_dir / (
+        "squares.json" if side == "white" else "squares_black.json"
+    )
     json_path.write_text(
         json.dumps(data, indent=1), encoding="utf-8"
     )
@@ -226,20 +253,26 @@ if __name__ == "__main__":
 
     root = Path(__file__).resolve().parent.parent
     out = root / "assets" / "board"
-    png, js = generate(out, BOARD_IMG_W, BOARD_IMG_H)
+    for side_name in ("white", "black"):
+        png, js = generate(out, BOARD_IMG_W, BOARD_IMG_H, side=side_name)
 
-    # Sanidade: tudo dentro da imagem, 64 casas, escala decrescente
-    data = json.loads(js.read_text(encoding="utf-8"))
-    assert len(data["squares"]) == 64
-    for sq in data["squares"]:
-        for x, y in sq["polygon"]:
-            assert 0 <= x < data["width"], sq
-            assert 0 <= y < data["height"], sq
-    by_rank = sorted(
-        data["squares"], key=lambda s: s["square"]
-    )
-    scales = [by_rank[r * 8]["scale"] for r in range(8)]
-    assert scales == sorted(scales, reverse=True), scales
-    assert math.isclose(scales[0], 1.0, rel_tol=0.02), scales[0]
-    print(f"ok: {png}")
-    print(f"ok: {js} (64 casas, escalas {scales[0]:.3f}..{scales[-1]:.3f})")
+        # Sanidade: tudo dentro da imagem, 64 casas, escala decrescente
+        # da fileira perto da câmera para a distante.
+        data = json.loads(js.read_text(encoding="utf-8"))
+        assert len(data["squares"]) == 64
+        for sq in data["squares"]:
+            for x, y in sq["polygon"]:
+                assert 0 <= x < data["width"], sq
+                assert 0 <= y < data["height"], sq
+        by_rank = sorted(
+            data["squares"], key=lambda s: s["square"]
+        )
+        scales = [by_rank[r * 8]["scale"] for r in range(8)]
+        near_first = scales if side_name == "white" else scales[::-1]
+        assert near_first == sorted(near_first, reverse=True), scales
+        assert math.isclose(near_first[0], 1.0, rel_tol=0.02), near_first[0]
+        print(f"ok: {png}")
+        print(
+            f"ok: {js} (64 casas, escalas {near_first[0]:.3f}.."
+            f"{near_first[-1]:.3f})"
+        )

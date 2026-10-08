@@ -4,8 +4,14 @@ Carrega ``assets/board/squares.json`` (gerado por ``tools/gen_board.py``)
 e fornece:
   - centro/escala/polígono de cada casa;
   - conversão pixel → casa (teste de ponto em polígono);
-  - o mapa espelhado (tabuleiro virado: rotação de 180°);
   - ordem de desenho de trás para frente (longe → perto).
+
+**Uma visão por mapa:** existem dois mapas gerados — o das brancas
+(``squares.json``) e o das pretas (``squares_black.json``) — cada um
+com a re-projeção correta da própria câmera (incluindo o texto das
+coordenadas gravado na imagem correspondente). A orientação ativa é a
+única fonte de verdade de ``casa ↔ tela``; ``ui/board_view.py`` apenas
+alterna qual par (mapa, imagem) está ativo.
 
 Módulo **puro** — usado por ``ui/board_view.py`` e pelos testes.
 """
@@ -61,28 +67,6 @@ class BoardMap:
             for entry in data["squares"]
         }
         return cls(squares, int(data["width"]), int(data["height"]))
-
-    def flipped(self) -> BoardMap:
-        """Mapa do tabuleiro virado (rotação de 180° da imagem).
-
-        Cada casa mantém sua identidade: a posição exibida é a
-        posição física da própria casa rotacionada 180° (a1, que era
-        o canto de baixo-esquerda, passa ao topo-direita).
-        """
-
-        def rot(p: Point) -> Point:
-            return (float(self.width) - p[0], float(self.height) - p[1])
-
-        squares = {
-            sq: SquareGeom(
-                square=sq,
-                polygon=tuple(rot(p) for p in self._squares[sq].polygon),
-                center=rot(self._squares[sq].center),
-                scale=self._squares[sq].scale,
-            )
-            for sq in self._squares
-        }
-        return BoardMap(squares, self.width, self.height)
 
     # ── consultas ────────────────────────────────────────
 
