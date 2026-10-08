@@ -251,3 +251,41 @@
   PGN em programa de xadrez de terceiros) seguem documentados no
   CHECKLIST como limitações do ambiente de CI; o jogo em uso real
   foi validado no PC alvo.
+
+## [1.0.0-dev] - 2026-10-08
+
+### Fase 7.2 — Empacotamento Windows (onedir, windowed)
+
+- Ícone `assets/icons/xadtitans.ico` gerado por `tools/gen_icon.py`
+  a partir do sprite próprio CC0 do rei branco (recorte por bounding
+  box do alfa + centralização em tela 256×256); 7 resoluções
+  (16/24/32/48/64/128/256 px, 32-bit com alfa); sem arte de
+  terceiros e sem dependência nova (Pillow já era requisito de dev).
+- Versão centralizada: `xadtitans.__version__ = "1.0.0"` é a única
+  fonte de verdade — menu (rótulo discreto `v1.0.0` no canto
+  inferior esquerdo via `menu_scene.version_label()`), version-file
+  e metadados do executável derivam do mesmo valor.
+- `tools/build_exe.py`: build reproduzível com o PyInstaller do
+  `.venv` (nunca o global do PATH); argumentos fixos documentados —
+  onedir, windowed, sem UPX, `--paths src`, `--add-data assets;assets`,
+  `--icon`, exclusões de `tests`/`pytest`; version-file gerado de
+  `__version__` em `build/` (gitignored) com validação round-trip pelo
+  parser real do PyInstaller; pós-validação obrigatória dos assets no
+  pacote (inclusive a visão preta `board_perspective_black.png` +
+  `squares_black.json`).
+- Correção de robustez para `--windowed`: `main.py` ganhou
+  `_ensure_streams()` — no modo windowed o PyInstaller define
+  `sys.stdout/stderr = None`, o que quebraria `print(file=sys.stderr)`
+  no handler de erro fatal e o `StreamHandler` do logger; agora os
+  streams ausentes são apontados para `os.devnull` antes de qualquer
+  import que possa logar.
+- Primeiro pacote gerado e validado nesta máquina: `dist/XadTitans`
+  (33.6 MB), recursos RT_ICON/RT_GROUP_ICON/RT_VERSION presentes,
+  version resource com `1.0.0.0` e string table correta; exe inicia o
+  App completo (Settings → janela → áudio → menu → loop) e roda sem
+  erro por 10 s com SDL dummy e diretório de dados isolado. O teste em
+  máquina sem Python, autosave/log reais e antivírus ficam para a
+  Fase 7.3; zip + hash para a 7.4.
+- Testes: +11 (`tests/test_packaging.py` — ícone multiresolução,
+  versão 1.0.0/label do menu, argumentos do build, version-file
+  determinístico, guarda de streams). 1021 testes passando; Ruff limpo.

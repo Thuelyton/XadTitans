@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import pygame
 
+from xadtitans import __version__
 from xadtitans.audio import AudioManager
 from xadtitans.config import COLOR_BG, WINDOW_HEIGHT, WINDOW_WIDTH
 from xadtitans.i18n import t
@@ -25,6 +26,11 @@ from xadtitans.ui.widgets.button import Button
 
 if TYPE_CHECKING:
     from xadtitans.ui.scene_manager import SceneManager
+
+
+def version_label() -> str:
+    """Rótulo de versão exibido no menu (``xadtitans.__version__``)."""
+    return f"v{__version__}"
 
 
 class MenuScene:
@@ -45,6 +51,7 @@ class MenuScene:
         self._title_font = pygame.font.SysFont("arial", 48, bold=True)
         self._subtitle_font = pygame.font.SysFont("arial", 20)
         self._msg_font = pygame.font.SysFont("arial", 18)
+        self._version_font = pygame.font.SysFont("arial", 14)
 
         self.buttons: list[Button] = []
         self._build_buttons()
@@ -176,6 +183,10 @@ class MenuScene:
         sub_surf = self._subtitle_font.render(t("menu.subtitle"), True, (180, 180, 180))
         sub_rect = sub_surf.get_rect(center=(WINDOW_WIDTH // 2, 175))
         surface.blit(sub_surf, sub_rect)
+
+        # Versão (discreta, canto inferior esquerdo)
+        ver_surf = self._version_font.render(version_label(), True, (130, 130, 130))
+        surface.blit(ver_surf, (12, WINDOW_HEIGHT - 26))
 
         # Botões
         for btn in self.buttons:

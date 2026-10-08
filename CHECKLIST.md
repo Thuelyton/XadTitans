@@ -208,18 +208,18 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 
 ## FASE 7 — Empacotamento (.exe)
 
-- [ ] Criar o ícone `assets/icons/xadtitans.ico`
-- [ ] Guardar a versão em `xadtitans/__init__.py` e mostrá-la no menu
-- [ ] Criar `tools/build_exe.py` (ou script `.bat`) com o comando do PyInstaller
-- [ ] Gerar o build em modo `onedir`
-- [ ] Conferir que sons, imagens e fontes são encontrados dentro do executável
-- [ ] Testar o `.exe` em máquina **sem Python instalado**
-- [ ] Testar autosave, salvamento e log dentro do executável
-- [ ] Verificar comportamento com o antivírus (falsos positivos)
-- [ ] Incluir `LICENSE`, `CREDITS.md` e `README.md` na pasta final
-- [ ] Gerar o `.zip` de release e o hash SHA-256
-- [ ] (Opcional) Criar instalador com Inno Setup
-- [ ] Commit da fase
+- [x] Criar o ícone `assets/icons/xadtitans.ico` (Fase 7.2 — gerado por `tools/gen_icon.py` do sprite próprio CC0 do rei branco; 16–256 px; RT_ICON/RT_GROUP_ICON verificados no exe)
+- [x] Guardar a versão em `xadtitans/__init__.py` e mostrá-la no menu (Fase 7.2 — `1.0.0` como única fonte de verdade: menu (rótulo `v1.0.0`), version-file e metadados do exe derivam do mesmo valor)
+- [x] Criar `tools/build_exe.py` (ou script `.bat`) com o comando do PyInstaller (Fase 7.2 — usa `.venv\Scripts\pyinstaller.exe`, argumentos fixos, version-file com round-trip validado, pós-validação de assets no pacote)
+- [x] Gerar o build em modo `onedir` (Fase 7.2 — `dist/XadTitans` 33.6 MB, windowed, sem UPX; exe validado nesta máquina: sobe o App completo e roda sem erro com drivers dummy)
+- [x] Conferir que sons, imagens e fontes são encontrados dentro do executável (Fase 7.2 — 8 assets essenciais conferidos no `_internal` incluindo a visão preta; fontes = Arial do sistema, sem fontes próprias para embutir)
+- [ ] Testar o `.exe` em máquina **sem Python instalado** (Fase 7.3 — PC alvo)
+- [ ] Testar autosave, salvamento e log dentro do executável (Fase 7.3)
+- [ ] Verificar comportamento com o antivírus (falsos positivos) (Fase 7.3)
+- [ ] Incluir `LICENSE`, `CREDITS.md` e `README.md` na pasta final (Fase 7.4)
+- [ ] Gerar o `.zip` de release e o hash SHA-256 (Fase 7.4)
+- [ ] (Opcional) Criar instalador com Inno Setup (Fase 7.4)
+- [ ] Commit da fase (pendente aprovação da Fase 7.2)
 
 **Pronto quando:** o `.zip` abre e joga em uma máquina limpa, do menu até o fim de uma partida.
 
