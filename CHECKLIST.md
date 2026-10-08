@@ -216,10 +216,10 @@ Passo a passo do início ao fim. Marque `- [x]` ao concluir cada item. Só avanc
 - [x] Testar o `.exe` em máquina **sem Python instalado** (Fase 7.3 — **CONCLUÍDO COM RESSALVA**: validação em máquina sem Python **não foi possível neste ambiente** (sem 2ª máquina física nem virtualização disponível); a **autocontenção do bundle foi verificada por inspeção + execução real** — `python312.dll`, `VCRUNTIME140(.1)`, SDL2/pygame e assets embutidos; `XadTitans.exe` executou com sucesso como `WINDOWS_GUI` (sem console, sem depender de terminal nem do Python do sistema). **Teste complementar em máquina/VM sem Python permanece recomendado**)
 - [x] Testar autosave, salvamento e log dentro do executável (Fase 7.3 — autosave/persistência confirmados em `%APPDATA%\XadTitans\autosave\game.json` com retomada via "Continuar" e **zero writes em `_internal/`**; log é *lazy* (criado só em warning/exception por design), sem crash relacionado ao modo windowed. **Anomalia**: no 1º lançamento o autosave pré-existente avançou 17 lances até o fim sem clique humano — **não reproduzida nas execuções controladas posteriores**)
 - [x] Verificar comportamento com o antivírus (falsos positivos) (Fase 7.3 — **SmartScreen/Defender não apresentou alerta neste ambiente**; exe está `NotSigned`, então alerta em download real de máquina limpa permanece possível. **Teste auditivo em hardware real permanece como validação complementar**)
-- [ ] Incluir `LICENSE`, `CREDITS.md` e `README.md` na pasta final (Fase 7.4)
-- [ ] Gerar o `.zip` de release e o hash SHA-256 (Fase 7.4)
-- [ ] (Opcional) Criar instalador com Inno Setup (Fase 7.4)
-- [ ] Commit da fase (pendente aprovação da Fase 7.2)
+- [x] Incluir `LICENSE`, `CREDITS.md` e `README.md` na pasta final (Fase 7.4 — copiados para `dist/XadTitans/` sem modificar conteúdo; validados por SHA-256 idêntico ao original. Sem CHECKLIST/CHANGELOG/testes na distribuição)
+- [x] Gerar o `.zip` de release e o hash SHA-256 (Fase 7.4 — `dist/XadTitans-1.0.0-windows-x64.zip` 15.9 MB, raiz única `XadTitans/` com o bundle completo (103 arquivos, separador `/`); `XadTitans-1.0.0-windows-x64.sha256` gerado e revalidado: `c2a67cfb1cf645e4c144b09b2e9d9143d89cc1e8cd5f21b3c4bc356ec95c3b29`)
+- [ ] (Opcional) Criar instalador com Inno Setup (Fase 7.4 — **não implementado/validado**; permanece como etapa futura opcional. A prioridade da 7.4 era ZIP + SHA-256)
+- [x] Commit da fase (Fase 7.4 — commit `docs` da release + tag `v1.0.0`)
 
 **Pronto quando:** o `.zip` abre e joga em uma máquina limpa, do menu até o fim de uma partida.
 
