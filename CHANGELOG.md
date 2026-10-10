@@ -289,3 +289,29 @@
 - Testes: +11 (`tests/test_packaging.py` — ícone multiresolução,
   versão 1.0.0/label do menu, argumentos do build, version-file
   determinístico, guarda de streams). 1021 testes passando; Ruff limpo.
+
+## [1.0.0] - 2026-10-10
+
+### Fase 7.4 — Auditoria de encerramento e release estable
+
+- **Anomalia da Fase 7.3 esclarecida (sem defeito de código)**:
+  investigação controlada com dados isolados, lances carimbados com
+  horário e zero entrada após o 1º lance humano demonstrou que (a) em
+  partidas **novas** Jogador vs IA a IA responde exatamente 1 lance e
+  para, nunca jogando pelo lado humano; e (b) a assinatura observada
+  na 7.3 (**17 lances sem clique humano**) é reproduzida ao usar
+  "Continuar" sobre um **autosave pré-existente de partida IA vs IA**
+  — automação total por design do modo. Registro histórico da 7.3
+  preservado no CHECKLIST; melhoria de UX (aviso ao continuar partida
+  IA vs IA) registrada como pendência futura, não implementada nesta
+  etapa.
+- **Teste real do EXE**: `XadTitans.exe` windowed executou com dados
+  isolados — janela 1024×768, partida Jogador vs IA criada por cliques
+  reais (autosave gravado), lance humano `e2e4` → resposta da IA
+  `e7e5` e parada, encerramento via `WM_CLOSE` com exit code 0.
+- **Auditoria do pacote**: ZIP com raiz única `XadTitans/` e 103
+  arquivos (EXE + `_internal` + LICENSE/CREDITS/README), sem código-
+  fonte, testes, caches, dados pessoais ou segredos; SHA-256
+  revalidado (`c2a67cfb…c3b29`).
+- Encerramento: documentação de fechamento (CHECKLIST/CHANGELOG) e
+  publicação da GitHub Release `v1.0.0` com ZIP + hash anexados.
